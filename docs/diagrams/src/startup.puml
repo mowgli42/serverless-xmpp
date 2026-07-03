@@ -1,0 +1,80 @@
+@startuml startup
+!theme plain
+autonumber
+
+title Connection Service Startup — Address Book & Initialization
+
+actor User
+participant "CLI\n__main__.py" as CLI
+participant "ConnectionService" as SVC
+participant "AddressBookManager" as AB
+participant "PersistenceManager" as DB
+participant "SessionManager" as SESS
+participant "DirectP2PTransport" as P2P
+participant "MdnsDiscovery" as MDNS
+participant "RpcServer\n(WebSocket)" as RPC
+participant "WebUIServer" as WEB
+
+User -> CLI : python -m xmpp_p2p_chat.connection_service
+CLI -> SVC : load_config()\nConnectionService(config)
+note over SVC : Constructs managers;\nno network I/O yet
+
+CLI -> SVC : run_forever() → start()
+
+== Address book (first) ==
+
+SVC -> AB : process_startup(bundled_path, import_if_empty)
+AB -> AB : load()
+AB -> AB : Read addressbook.json\n(or create empty array)
+AB -> AB : Merge addressbooks.d/*.json
+AB -> AB : Validate contacts;\nquarantine malformed JSON
+AB -> AB : compute_content_hash()\n→ SHA256 canonical hash
+AB -> AB : load .addressbook-meta.json\n(bump version if hash changed)
+
+alt User book empty AND import_bundled_if_empty
+  AB -> AB : Copy bundled share/addressbook.json\n→ primary path
+  AB -> AB : load() again
+end
+
+AB -> AB : _save_meta()\n(version, hash, contact_count)
+AB --> SVC : ready (N contacts, v{version})
+
+== Persistence ==
+
+SVC -> DB : initialize()\n(open SQLite, migrate schema)
+
+== Transports (driven by address book contents) ==
+
+SVC -> SESS : initialize()
+SESS -> SESS : Build jid → contact_id map\nfrom addressbook.contacts
+
+alt Any direct-p2p contact OR p2p.local_jid configured
+  SESS -> P2P : _ensure_p2p()
+  P2P -> P2P : Load/generate TLS cert\n(in p2p/ cert dir)
+  P2P -> P2P : start_server(listen_host:listen_port)
+  loop For each contact with direct endpoint
+    SESS -> P2P : register peer\n(host, port, fingerprint)
+  end
+  opt mdns_enabled
+    SESS -> MDNS : start()\nadvertise _xmpp-p2p._tcp.local.
+  end
+end
+
+alt XMPP jid + password AND xmpp-server contacts
+  SESS -> SESS : _ensure_xmpp()\n(slixmpp connect + SASL)
+end
+
+SESS -> DB : list_active_chats()\n(restore sessions)
+
+== Local API ==
+
+SVC -> RPC : websockets.serve(:8765/rpc)
+note over RPC : UIs can now connect
+
+opt serve_web AND web_ui/dist exists
+  SVC -> WEB : start(:8767)
+end
+
+SVC --> User : Service running\n(contacts loaded, hash computed)
+
+@enduml

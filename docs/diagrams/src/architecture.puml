@@ -1,0 +1,72 @@
+@startuml architecture
+!theme plain
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+title serverless-xmpp — System Architecture
+
+package "User Interfaces (thin clients)" {
+  [Text TUI\n(Textual)] as TUI
+  [Web SPA\n(Svelte + Vite)] as WEB
+}
+
+package "Connection Service\n(python -m xmpp_p2p_chat.connection_service)" {
+  [WebSocket JSON-RPC\n:8765/rpc] as RPC
+  [Web UI Server\n:8767/] as WEBSVR
+  [RpcServer] as RPCSVR
+  [SessionManager] as SESS
+  [AddressBookManager] as AB
+  [PersistenceManager\nSQLite] as DB
+
+  package "Transports" {
+    [DirectP2PTransport\nTLS + XML streams] as P2P
+    [XMPPServerTransport\n(slixmpp client)] as XMPP
+  }
+
+  [MdnsDiscovery\nzeroconf] as MDNS
+}
+
+cloud "External XMPP Server\n(Prosody, etc.)" as XMPPSRV
+node "Remote Peer\n(direct P2P)" as PEER
+
+folder "Data Directory\n~/.local/share/xmpp-p2p-chat/" {
+  file "addressbook.json" as ABFILE
+  file "addressbooks.d/*.json" as ABFRAG
+  file ".addressbook-meta.json" as ABMETA
+  file "messages.db" as SQLITE
+  file "p2p/*.pem" as CERTS
+}
+
+TUI --> RPC : WebSocket\nJSON-RPC
+WEB --> RPC : WebSocket\nJSON-RPC
+WEB --> WEBSVR : HTTP\n(static assets)
+
+RPC --> RPCSVR
+WEBSVR ..> WEB : serves built\ndist/
+
+RPCSVR --> SESS
+RPCSVR --> AB
+RPCSVR --> DB
+SESS --> AB
+SESS --> DB
+SESS --> P2P
+SESS --> XMPP
+SESS --> MDNS
+
+P2P --> PEER : TCP/TLS\njabber:client XML
+XMPP --> XMPPSRV : TCP\nSTARTTLS + SASL
+
+AB --> ABFILE
+AB --> ABFRAG
+AB --> ABMETA
+DB --> SQLITE
+P2P --> CERTS
+MDNS --> P2P : advertises\nlisten port + fp
+
+note right of AB
+  Bundled seed:
+  share/addressbook.json
+  imported on first run
+end note
+
+@enduml

@@ -1,0 +1,80 @@
+@startuml client_connection
+!theme plain
+autonumber
+
+title UI Client Connection & Chat Flow
+
+actor User
+participant "Text TUI\nor Web SPA" as UI
+participant "APIClient\n/ ChatAPI" as API
+participant "RpcServer" as RPC
+participant "SessionManager" as SESS
+participant "AddressBookManager" as AB
+participant "DirectP2PTransport\nor XMPPServerTransport" as XPORT
+participant "PersistenceManager" as DB
+participant "Remote Peer\nor XMPP Server" as REMOTE
+
+== Connect ==
+
+User -> UI : Launch TUI / open browser
+UI -> API : connect()\nws://127.0.0.1:8765/rpc
+API -> RPC : WebSocket handshake
+RPC --> API : connected
+opt api_token configured
+  API -> RPC : auth {token}
+  RPC --> API : ok
+end
+
+== Load address book ==
+
+UI -> API : call("addressbook.list")
+API -> RPC : JSON-RPC request
+RPC -> AB : contacts + status()\n(version, content_hash, hash_blocks)
+RPC --> API : {contacts, presence, status}
+API --> UI : Render sidebar\n+ hash grid (v{N})
+
+== Start chat ==
+
+User -> UI : Select contact "Bob"
+UI -> API : call("chat.start", {contact_id: "bob"})
+API -> RPC : JSON-RPC
+RPC -> SESS : start_chat("bob")
+SESS -> AB : get("bob")
+SESS -> SESS : _resolve_transport_name()\n(direct-p2p | xmpp-server)
+
+alt direct-p2p
+  SESS -> XPORT : connect_peer(host, port, fingerprint)
+  XPORT -> REMOTE : TCP/TLS + stream:stream
+else xmpp-server
+  SESS -> XPORT : ensure connected\n(slixmpp session)
+end
+
+SESS -> DB : create/restore ChatSession
+RPC --> UI : {chat_id: "bob", transport: "..."}
+
+UI -> API : call("chat.get_history", {chat_id, limit})
+RPC -> DB : query messages
+RPC --> UI : message history
+
+== Send message ==
+
+User -> UI : Type message, press Enter
+UI -> UI : Optimistic UI update
+UI -> API : call("chat.send_message", {chat_id, body})
+RPC -> SESS : send_message()
+SESS -> DB : save (status: pending)
+SESS -> XPORT : send_message(to_jid, body)
+XPORT -> REMOTE : <message type="chat">...</message>
+SESS -> DB : update status → sent/delivered
+RPC -> UI : push message.updated\n(all connected clients)
+
+== Receive message ==
+
+REMOTE -> XPORT : inbound stanza
+XPORT -> SESS : on_message callback
+SESS -> DB : save message
+SESS -> RPC : push message.received
+RPC -> UI : WebSocket notification
+UI --> User : Display incoming message
+
+@enduml

@@ -131,80 +131,9 @@ TXT records include `jid`, `fp` (TLS fingerprint), and `transport`. This supplem
 
 ## 3. System Architecture
 
-```plantuml
-@startuml architecture
-!theme plain
-skinparam componentStyle rectangle
-skinparam shadowing false
+![System architecture diagram](diagrams/architecture.png)
 
-title serverless-xmpp — System Architecture
-
-package "User Interfaces (thin clients)" {
-  [Text TUI\n(Textual)] as TUI
-  [Web SPA\n(Svelte + Vite)] as WEB
-}
-
-package "Connection Service\n(python -m xmpp_p2p_chat.connection_service)" {
-  [WebSocket JSON-RPC\n:8765/rpc] as RPC
-  [Web UI Server\n:8767/] as WEBSVR
-  [RpcServer] as RPCSVR
-  [SessionManager] as SESS
-  [AddressBookManager] as AB
-  [PersistenceManager\nSQLite] as DB
-
-  package "Transports" {
-    [DirectP2PTransport\nTLS + XML streams] as P2P
-    [XMPPServerTransport\n(slixmpp client)] as XMPP
-  }
-
-  [MdnsDiscovery\nzeroconf] as MDNS
-}
-
-cloud "External XMPP Server\n(Prosody, etc.)" as XMPPSRV
-node "Remote Peer\n(direct P2P)" as PEER
-
-folder "Data Directory\n~/.local/share/xmpp-p2p-chat/" {
-  file "addressbook.json" as ABFILE
-  file "addressbooks.d/*.json" as ABFRAG
-  file ".addressbook-meta.json" as ABMETA
-  file "messages.db" as SQLITE
-  file "p2p/*.pem" as CERTS
-}
-
-TUI --> RPC : WebSocket\nJSON-RPC
-WEB --> RPC : WebSocket\nJSON-RPC
-WEB --> WEBSVR : HTTP\n(static assets)
-
-RPC --> RPCSVR
-WEBSVR ..> WEB : serves built\ndist/
-
-RPCSVR --> SESS
-RPCSVR --> AB
-RPCSVR --> DB
-SESS --> AB
-SESS --> DB
-SESS --> P2P
-SESS --> XMPP
-SESS --> MDNS
-
-P2P --> PEER : TCP/TLS\njabber:client XML
-XMPP --> XMPPSRV : TCP\nSTARTTLS + SASL
-
-AB --> ABFILE
-AB --> ABFRAG
-AB --> ABMETA
-DB --> SQLITE
-P2P --> CERTS
-MDNS --> P2P : advertises\nlisten port + fp
-
-note right of AB
-  Bundled seed:
-  share/addressbook.json
-  imported on first run
-end note
-
-@enduml
-```
+*Source: [diagrams/src/architecture.puml](diagrams/src/architecture.puml)*
 
 ### Data directory layout
 
@@ -226,88 +155,9 @@ Config lives separately (typically `~/.config/xmpp-p2p-chat/config.toml`).
 
 The address book is the **first substantive I/O** during service startup — before SQLite, transports, or the RPC listener.
 
-```plantuml
-@startuml startup
-!theme plain
-autonumber
+![Startup sequence diagram](diagrams/startup.png)
 
-title Connection Service Startup — Address Book & Initialization
-
-actor User
-participant "CLI\n__main__.py" as CLI
-participant "ConnectionService" as SVC
-participant "AddressBookManager" as AB
-participant "PersistenceManager" as DB
-participant "SessionManager" as SESS
-participant "DirectP2PTransport" as P2P
-participant "MdnsDiscovery" as MDNS
-participant "RpcServer\n(WebSocket)" as RPC
-participant "WebUIServer" as WEB
-
-User -> CLI : python -m xmpp_p2p_chat.connection_service
-CLI -> SVC : load_config()\nConnectionService(config)
-note over SVC : Constructs managers;\nno network I/O yet
-
-CLI -> SVC : run_forever() → start()
-
-== Address book (first) ==
-
-SVC -> AB : process_startup(bundled_path, import_if_empty)
-AB -> AB : load()
-AB -> AB : Read addressbook.json\n(or create empty array)
-AB -> AB : Merge addressbooks.d/*.json
-AB -> AB : Validate contacts;\nquarantine malformed JSON
-AB -> AB : compute_content_hash()\n→ SHA256 canonical hash
-AB -> AB : load .addressbook-meta.json\n(bump version if hash changed)
-
-alt User book empty AND import_bundled_if_empty
-  AB -> AB : Copy bundled share/addressbook.json\n→ primary path
-  AB -> AB : load() again
-end
-
-AB -> AB : _save_meta()\n(version, hash, contact_count)
-AB --> SVC : ready (N contacts, v{version})
-
-== Persistence ==
-
-SVC -> DB : initialize()\n(open SQLite, migrate schema)
-
-== Transports (driven by address book contents) ==
-
-SVC -> SESS : initialize()
-SESS -> SESS : Build jid → contact_id map\nfrom addressbook.contacts
-
-alt Any direct-p2p contact OR p2p.local_jid configured
-  SESS -> P2P : _ensure_p2p()
-  P2P -> P2P : Load/generate TLS cert\n(in p2p/ cert dir)
-  P2P -> P2P : start_server(listen_host:listen_port)
-  loop For each contact with direct endpoint
-    SESS -> P2P : register peer\n(host, port, fingerprint)
-  end
-  opt mdns_enabled
-    SESS -> MDNS : start()\nadvertise _xmpp-p2p._tcp.local.
-  end
-end
-
-alt XMPP jid + password AND xmpp-server contacts
-  SESS -> SESS : _ensure_xmpp()\n(slixmpp connect + SASL)
-end
-
-SESS -> DB : list_active_chats()\n(restore sessions)
-
-== Local API ==
-
-SVC -> RPC : websockets.serve(:8765/rpc)
-note over RPC : UIs can now connect
-
-opt serve_web AND web_ui/dist exists
-  SVC -> WEB : start(:8767)
-end
-
-SVC --> User : Service running\n(contacts loaded, hash computed)
-
-@enduml
-```
+*Source: [diagrams/src/startup.puml](diagrams/src/startup.puml)*
 
 **When is the address book read?**
 
@@ -326,88 +176,9 @@ Both UIs display **version** and an **8×8 hash color grid** derived from `conte
 
 UIs never speak XMPP directly. They connect to the local RPC endpoint, load contacts (including hash status), then start chats through the Session Manager.
 
-```plantuml
-@startuml client_connection
-!theme plain
-autonumber
+![Client connection sequence diagram](diagrams/client-connection.png)
 
-title UI Client Connection & Chat Flow
-
-actor User
-participant "Text TUI\nor Web SPA" as UI
-participant "APIClient\n/ ChatAPI" as API
-participant "RpcServer" as RPC
-participant "SessionManager" as SESS
-participant "AddressBookManager" as AB
-participant "DirectP2PTransport\nor XMPPServerTransport" as XPORT
-participant "PersistenceManager" as DB
-participant "Remote Peer\nor XMPP Server" as REMOTE
-
-== Connect ==
-
-User -> UI : Launch TUI / open browser
-UI -> API : connect()\nws://127.0.0.1:8765/rpc
-API -> RPC : WebSocket handshake
-RPC --> API : connected
-opt api_token configured
-  API -> RPC : auth {token}
-  RPC --> API : ok
-end
-
-== Load address book ==
-
-UI -> API : call("addressbook.list")
-API -> RPC : JSON-RPC request
-RPC -> AB : contacts + status()\n(version, content_hash, hash_blocks)
-RPC --> API : {contacts, presence, status}
-API --> UI : Render sidebar\n+ hash grid (v{N})
-
-== Start chat ==
-
-User -> UI : Select contact "Bob"
-UI -> API : call("chat.start", {contact_id: "bob"})
-API -> RPC : JSON-RPC
-RPC -> SESS : start_chat("bob")
-SESS -> AB : get("bob")
-SESS -> SESS : _resolve_transport_name()\n(direct-p2p | xmpp-server)
-
-alt direct-p2p
-  SESS -> XPORT : connect_peer(host, port, fingerprint)
-  XPORT -> REMOTE : TCP/TLS + stream:stream
-else xmpp-server
-  SESS -> XPORT : ensure connected\n(slixmpp session)
-end
-
-SESS -> DB : create/restore ChatSession
-RPC --> UI : {chat_id: "bob", transport: "..."}
-
-UI -> API : call("chat.get_history", {chat_id, limit})
-RPC -> DB : query messages
-RPC --> UI : message history
-
-== Send message ==
-
-User -> UI : Type message, press Enter
-UI -> UI : Optimistic UI update
-UI -> API : call("chat.send_message", {chat_id, body})
-RPC -> SESS : send_message()
-SESS -> DB : save (status: pending)
-SESS -> XPORT : send_message(to_jid, body)
-XPORT -> REMOTE : <message type="chat">...</message>
-SESS -> DB : update status → sent/delivered
-RPC -> UI : push message.updated\n(all connected clients)
-
-== Receive message ==
-
-REMOTE -> XPORT : inbound stanza
-XPORT -> SESS : on_message callback
-SESS -> DB : save message
-SESS -> RPC : push message.received
-RPC -> UI : WebSocket notification
-UI --> User : Display incoming message
-
-@enduml
-```
+*Source: [diagrams/src/client-connection.puml](diagrams/src/client-connection.puml)*
 
 **Push events** keep multiple UIs in sync without polling:
 
@@ -424,62 +195,9 @@ UI --> User : Display incoming message
 
 ### 4.3 Shutdown
 
-```plantuml
-@startuml shutdown
-!theme plain
-autonumber
+![Shutdown sequence diagram](diagrams/shutdown.png)
 
-title Connection Service Shutdown
-
-actor User
-participant "Signal / RPC" as TRIGGER
-participant "ConnectionService" as SVC
-participant "WebUIServer" as WEB
-participant "RpcServer\n(WebSocket)" as RPC
-participant "SessionManager" as SESS
-participant "DirectP2PTransport" as P2P
-participant "MdnsDiscovery" as MDNS
-participant "XMPPServerTransport" as XMPP
-participant "PersistenceManager" as DB
-participant "UI Clients" as UI
-
-== Trigger ==
-
-alt SIGINT / SIGTERM
-  User -> TRIGGER : Ctrl+C / kill
-  TRIGGER -> SVC : shutdown()
-else RPC system.shutdown
-  User -> UI : shutdown button / admin
-  UI -> TRIGGER : system.shutdown
-  TRIGGER -> SVC : shutdown()
-else Packaged launcher (both mode)
-  User -> UI : Quit TUI
-  note over TRIGGER : Parent process\nSIGTERM to service\n(not graceful RPC)
-end
-
-== Teardown (reverse of startup) ==
-
-SVC -> WEB : stop()\n(shutdown HTTP thread)
-SVC -> RPC : close() + wait_closed()\n(drop all UI WebSockets)
-UI <--x RPC : connection closed
-
-SVC -> SESS : shutdown()
-SESS -> P2P : disconnect()\n(close peer streams,\nstop TLS listener)
-SESS -> MDNS : stop()\n(unregister mDNS service)
-SESS -> XMPP : disconnect()\n(slixmpp session end)
-
-SVC -> DB : close()\n(SQLite flush)
-SVC -> SVC : _shutdown_event.set()
-SVC --> User : Process exits
-
-note over UI
-  TUI/Web disconnect alone
-  does NOT stop the service —
-  only closes the WebSocket client
-end note
-
-@enduml
-```
+*Source: [diagrams/src/shutdown.puml](diagrams/src/shutdown.puml)*
 
 ---
 
@@ -700,10 +418,20 @@ The following are documented as future or non-goals (see `openspec/` design docs
 | [quick-start.md](quick-start.md) | Install and first run |
 | [multi-client-testing.md](multi-client-testing.md) | Prosody-based multi-client tests |
 
-### Rendering PlantUML diagrams
+### Diagram sources
 
-Paste any `@startuml` block into:
+| Diagram | PNG | PlantUML source |
+|---------|-----|-----------------|
+| System architecture | [architecture.png](diagrams/architecture.png) | [architecture.puml](diagrams/src/architecture.puml) |
+| Startup sequence | [startup.png](diagrams/startup.png) | [startup.puml](diagrams/src/startup.puml) |
+| Client connection | [client-connection.png](diagrams/client-connection.png) | [client-connection.puml](diagrams/src/client-connection.puml) |
+| Shutdown sequence | [shutdown.png](diagrams/shutdown.png) | [shutdown.puml](diagrams/src/shutdown.puml) |
 
-- [PlantUML online server](https://www.plantuml.com/plantuml/uml/)
-- VS Code / Cursor PlantUML extension
-- `plantuml docs/architecture.md` (with PlantUML CLI installed)
+Regenerate PNGs after editing a `.puml` file:
+
+```bash
+pip install plantuml six   # dev dependency for render script
+python scripts/render-diagrams.py
+```
+
+The render script uses the public [PlantUML server](https://www.plantuml.com/plantuml/) (network required). You can also open any `.puml` file in the [PlantUML online editor](https://www.plantuml.com/plantuml/uml/) or a local PlantUML/JAR install.
