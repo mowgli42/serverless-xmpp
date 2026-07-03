@@ -77,6 +77,21 @@ export function formatTime(ts) {
   }
 }
 
+export function formatSyncStatusLine(syncStatus) {
+  if (!syncStatus) return '';
+  if (!syncStatus.secret_configured) {
+    return 'Not configured — set addressbook.sync.secret in config';
+  }
+  const state = syncStatus.enabled ? 'Enabled' : 'Disabled';
+  const mode = syncStatus.auto_apply ? 'auto-apply' : 'manual review';
+  return `${state} · ${mode} · ${syncStatus.pending_count ?? 0} pending`;
+}
+
+export function formatPendingUpdate(update) {
+  if (!update) return '';
+  return `${update.action || '?'} from ${update.from_jid || '?'} (${update.contact_id || '?'})`;
+}
+
 export function buildStatusLine(transports = [], contactCount = 0, outbox = 0) {
   const base = transports.map((t) => `${t.transport}:${t.state}`).join(' · ') || 'unknown';
   let line = `${base} · ${contactCount} contacts`;

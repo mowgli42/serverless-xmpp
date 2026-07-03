@@ -173,6 +173,49 @@ def format_message_log(messages: list[dict], *, peer_name: str = "Peer") -> str:
     return "\n\n".join(format_message_line(m, peer_name=peer_name)[1] for m in messages)
 
 
+def format_pending_update_line(update: dict) -> str:
+    action = update.get("action", "?")
+    from_jid = update.get("from_jid", "?")
+    contact_id = update.get("contact_id", "?")
+    return f"[cyan]{action}[/] from {from_jid} · contact [bold]{contact_id}[/]"
+
+
+def format_sync_status_panel(
+    *,
+    sync_status: dict,
+    pending_updates: list[dict] | None = None,
+    max_pending_lines: int = 4,
+) -> str:
+    enabled = sync_status.get("enabled", False)
+    auto_apply = sync_status.get("auto_apply", False)
+    pending_count = sync_status.get("pending_count", 0)
+    secret_configured = sync_status.get("secret_configured", False)
+
+    if not secret_configured:
+        state = "[yellow]Not configured[/] — set [addressbook.sync] secret in config"
+    elif enabled:
+        state = "[green]Enabled[/]"
+    else:
+        state = "[dim]Disabled[/]"
+
+    mode = "auto-apply" if auto_apply else "manual review"
+    lines = [
+        f"[bold]Address book sync[/]  {state}",
+        f"Mode: {mode} · Pending: {pending_count}",
+    ]
+
+    pending = pending_updates or []
+    if pending_count and not pending:
+        lines.append("[dim]Loading pending updates…[/]")
+    elif pending:
+        for update in pending[:max_pending_lines]:
+            lines.append(f"  • {format_pending_update_line(update)}")
+        if len(pending) > max_pending_lines:
+            lines.append(f"  [dim]…and {len(pending) - max_pending_lines} more[/]")
+
+    return "\n".join(lines)
+
+
 def format_addressbook_status_panel(
     *,
     health: dict,
@@ -237,6 +280,8 @@ __all__ = [
     "format_message_line",
     "format_message_log",
     "format_message_timestamp",
+    "format_pending_update_line",
+    "format_sync_status_panel",
     "is_transport_connected",
     "prepare_contact_list",
     "presence_symbol",

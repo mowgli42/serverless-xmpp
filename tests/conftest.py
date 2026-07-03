@@ -101,6 +101,13 @@ def mock_api() -> MockAPIClient:
                 "timestamp": "2026-07-03T12:00:00+00:00",
             }
         },
+        "addressbook.sync_status": {
+            "enabled": False,
+            "auto_apply": False,
+            "pending_count": 0,
+            "secret_configured": False,
+        },
+        "addressbook.get_pending_updates": {"updates": []},
     }
     return client
 
