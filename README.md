@@ -4,9 +4,9 @@
 
 Uses pre-placed local address books to start peer-to-peer style chats (server-mediated XMPP for MVP, with architecture ready for direct P2P streams). Built for trusted circles who want control over their data and infrastructure.
 
-> **Status**: Early development. OpenSpec-driven specification complete. Ready for implementation with Cursor or other AI coding assistants.
+> **Status**: MVP implementation in progress — Connection Service, Text TUI, and Web SPA are functional. See [docs/quick-start.md](docs/quick-start.md).
 
-## Key Features (MVP Target)
+## Key Features
 
 - **Pre-placed Address Books** — Local JSON files (human-editable) define your contacts. No reliance on server rosters.
 - **Decoupled Architecture** — Connection Service handles all XMPP logic, transports, sessions, and persistence. UIs are thin clients.
@@ -15,34 +15,49 @@ Uses pre-placed local address books to start peer-to-peer style chats (server-me
   - Modern **Web SPA** (Svelte + Vite + Tailwind) — rich chat experience, works in any browser.
 - **Serverless Operation** — Zero hosted backend required. Connect to public/self-hosted XMPP servers or (future) direct P2P.
 - **Offline Resilience** — Message queuing, local history (SQLite), automatic retry.
-- **Privacy & Security** — Local data only, TLS 1.3 enforced, localhost-only API, no telemetry.
+- **Privacy & Security** — Local data only, TLS enforced, localhost-only API, no telemetry.
 - **Extensible** — Pluggable transports; easy to add direct P2P, E2EE, new UIs.
 
-## Quick Start (Once Implemented)
+## Quick Start
 
 ```bash
-# 1. Clone
 git clone https://github.com/mowgli42/serverless-xmpp.git
 cd serverless-xmpp
 
-# 2. Set up Python environment (uv or venv + pip)
-uv sync   # or pip install -e ".[dev]"
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
 
-# 3. Configure (copy samples)
+mkdir -p ~/.config/xmpp-p2p-chat ~/.local/share/xmpp-p2p-chat
 cp examples/config.sample.toml ~/.config/xmpp-p2p-chat/config.toml
 cp examples/addressbook.sample.json ~/.local/share/xmpp-p2p-chat/addressbook.json
+# Edit config.toml with your XMPP jid/password/server
 
-# 4. Run the Connection Service (in one terminal)
+# Terminal 1: Connection Service
 python -m xmpp_p2p_chat.connection_service
 
-# 5. Run the Text TUI (in another terminal)
+# Terminal 2: Text TUI
 python -m xmpp_p2p_chat.text_ui
 
-# 6. Open the Web UI
-# (served at http://localhost:8765/ui or run `npm run dev` in web_ui/)
+# Terminal 3: Web UI
+cd web_ui && npm install && npm run dev
+# Open http://localhost:5173
 ```
 
-See `docs/quick-start.md` (to be added) for detailed instructions and test XMPP account recommendations.
+Full details: [docs/quick-start.md](docs/quick-start.md)
+
+## Multi-Client Testing
+
+Test two users (alice ↔ bob) with a local Prosody server:
+
+```bash
+./scripts/test-multi-client.sh setup      # Start Docker Prosody + test accounts
+./scripts/test-multi-client.sh init-alice # Write alice config
+./scripts/test-multi-client.sh init-bob   # Write bob config
+./scripts/test-multi-client.sh service-alice  # Terminal 1
+./scripts/test-multi-client.sh service-bob    # Terminal 2
+```
+
+See [docs/multi-client-testing.md](docs/multi-client-testing.md).
 
 ## Architecture Overview
 
@@ -56,88 +71,52 @@ XMPP Servers  ←→  (Future) Direct P2P Peers
 
 Full details in `openspec/changes/serverless-xmpp-p2p-chat-client/design.md`.
 
-**Core Principles**:
-- Local-first & serverless
-- Strict separation of concerns (service vs UI)
-- Spec-driven development (OpenSpec)
-- Pragmatic, secure, and maintainable
-
-## Project Structure (Planned)
+## Project Structure
 
 ```
 serverless-xmpp/
-├── openspec/                          # Spec-driven development artifacts
-│   └── changes/serverless-xmpp-p2p-chat-client/
-│       ├── proposal.md
-│       ├── design.md
-│       ├── tasks.md
-│       └── specs/spec.md
 ├── src/xmpp_p2p_chat/
-│   ├── connection_service/            # Core daemon + API
-│   ├── text_ui/                       # Textual TUI
-│   └── common/
-├── web_ui/                            # Svelte + Vite SPA
-├── examples/
-│   ├── addressbook.sample.json
-│   └── config.sample.toml
-├── docs/
-├── pyproject.toml
-├── README.md
-└── AGENTS.md
+│   ├── connection_service/   # Core daemon, XMPP transport, WebSocket API
+│   ├── text_ui/              # Textual TUI
+│   └── common/               # Config, models, API client
+├── web_ui/                   # Svelte 5 SPA
+├── tests/                    # pytest unit + API integration tests
+├── docker/                   # Prosody for local testing
+├── scripts/                  # Multi-client test harness
+├── examples/                 # Sample config + addressbook
+└── openspec/                 # Spec-driven development artifacts
 ```
 
 ## Development
 
-This project is designed to be built with **Cursor** (or Claude/Codex) using the OpenSpec workflow.
+```bash
+pytest tests/ -v
+ruff check src tests
+```
 
-1. Read the current spec: `openspec/changes/serverless-xmpp-p2p-chat-client/specs/spec.md`
-2. Follow the checklist in `tasks.md`
-3. Implement incrementally, validating against Given/When/Then scenarios.
+This project follows the [OpenSpec](https://github.com/Fission-AI/OpenSpec) workflow. See `AGENTS.md` and `openspec/changes/serverless-xmpp-p2p-chat-client/tasks.md`.
 
-See `AGENTS.md` for detailed instructions for AI coding assistants.
+### Tech Stack
 
-### Tech Stack (MVP)
-
-- **Python 3.12+** + `slixmpp`, `textual`, `websockets`, `aiosqlite`
-- **Web UI**: Vite + Svelte 5 + Tailwind + daisyUI
+- **Python 3.12+** + `slixmpp`, `textual`, `websockets`, `aiosqlite`, `pydantic`
+- **Web UI**: Vite + Svelte 5 + Tailwind CSS
 - **API**: WebSocket + JSON-RPC 2.0 (localhost only)
 - **Persistence**: SQLite + JSON/TOML
 
-## OpenSpec
+## Status & Roadmap
 
-This repository uses **[OpenSpec](https://github.com/Fission-AI/OpenSpec)** for spec-driven development.
-
-All significant changes start with a proposal + detailed behavioral spec (requirements + scenarios) before any code is written. This keeps AI assistants (and humans) aligned and dramatically reduces rework.
-
-Current active change: `serverless-xmpp-p2p-chat-client`
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Open an issue or discussion first for larger changes.
-2. For code changes, create a new OpenSpec change folder or update an existing one.
-3. Follow the coding standards in `AGENTS.md`.
-4. Ensure new behavior is captured in specs with testable scenarios.
+- [x] OpenSpec requirements & design
+- [x] MVP: Connection Service + Address Book + Persistence + XMPP transport
+- [x] MVP: WebSocket JSON-RPC API
+- [x] MVP: Text TUI + Web SPA
+- [x] Multi-client test harness (Docker Prosody + scripts)
+- [ ] Direct P2P transport
+- [ ] Packaging & distribution
+- [ ] Polish, E2EE, embedded web UI server
 
 ## License
 
 MIT License — see `LICENSE` file.
-
-## Acknowledgments
-
-- Built with heavy inspiration from the XMPP ecosystem and XEP-0174 (Serverless Messaging).
-- UI/UX guidance drawn from Interaction Design Foundation (IxDF) patterns for chat interfaces (clear feedback, presence visibility, efficient message composition, error prevention, etc.).
-
-## Status & Roadmap
-
-- [x] Thorough OpenSpec requirements & design (July 2026)
-- [ ] MVP Implementation (Connection Service + Text TUI + Web UI)
-- [ ] Direct P2P transport
-- [ ] Packaging & distribution
-- [ ] Polish, testing, documentation
-
-**Want to help build it?** Star the repo, open an issue, or reach out.
 
 ---
 

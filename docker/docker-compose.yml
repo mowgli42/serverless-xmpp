@@ -1,0 +1,20 @@
+services:
+  prosody:
+    image: prosody/prosody:13.0
+    container_name: serverless-xmpp-prosody
+    ports:
+      - "5222:5222"
+      - "5269:5269"
+    volumes:
+      - ./prosody/prosody.cfg.lua:/etc/prosody/prosody.cfg.lua:ro
+      - prosody_data:/var/lib/prosody
+    environment:
+      - PROSODY_ADMIN=admin@localhost
+    healthcheck:
+      test: ["CMD", "prosodyctl", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  prosody_data:

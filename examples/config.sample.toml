@@ -1,0 +1,23 @@
+[data]
+directory = "~/.local/share/xmpp-p2p-chat"
+
+[connection]
+default_transport = "xmpp-server"
+api_host = "127.0.0.1"
+api_port = 8765
+api_token = ""
+
+[logging]
+level = "INFO"
+file = ""
+
+[security]
+enforce_tls = true
+allow_self_signed_direct = false
+
+[xmpp]
+# Local user JID for this client instance (required for sending messages)
+jid = "alice@localhost"
+password = "alice"
+server = "localhost"
+port = 5222

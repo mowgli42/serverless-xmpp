@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "xmpp-p2p-chat"
+version = "0.1.0"
+description = "Privacy-first serverless XMPP chat with decoupled connection service and multiple UIs"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "slixmpp>=1.8.5",
+    "textual>=1.0.0",
+    "websockets>=13.0",
+    "aiosqlite>=0.20.0",
+    "tomli>=2.0.0; python_version < '3.11'",
+    "tomli-w>=1.0.0",
+    "pydantic>=2.0.0",
+    "keyring>=25.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.8.0",
+    "pyright>=1.1.0",
+]
+
+[project.scripts]
+xmpp-p2p-service = "xmpp_p2p_chat.connection_service.__main__:main"
+xmpp-p2p-tui = "xmpp_p2p_chat.text_ui.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/xmpp_p2p_chat"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.12"

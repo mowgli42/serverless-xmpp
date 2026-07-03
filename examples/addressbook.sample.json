@@ -1,0 +1,13 @@
+[
+  {
+    "id": "bob",
+    "jid": "bob@localhost",
+    "name": "Bob Test",
+    "tags": ["test"],
+    "notes": "Local test contact for Prosody",
+    "preferred_transport": "xmpp-server",
+    "xmpp_server": "localhost",
+    "created_at": "2026-07-02T00:00:00Z",
+    "updated_at": "2026-07-02T00:00:00Z"
+  }
+]
