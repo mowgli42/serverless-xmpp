@@ -8,6 +8,8 @@
     findLocalContact,
     formatHashCompact,
     formatLocalIdentity,
+    formatPendingUpdate,
+    formatSyncStatusLine,
     formatTime,
     isAwaitingConnection,
     prepareContactList,
@@ -17,6 +19,8 @@
   let contacts = $state([]);
   let presence = $state({});
   let addressbookStatus = $state(null);
+  let syncStatus = $state(null);
+  let pendingUpdates = $state([]);
   let selectedId = $state(null);
   let selectedName = $state('');
   let messages = $state([]);
@@ -38,6 +42,13 @@
   let filteredContacts = $derived(
     prepareContactList(contacts, presence, { needle: contactSearch, sortMode }),
   );
+  let syncStatusLine = $derived(formatSyncStatusLine(syncStatus));
+
+  $effect(() => {
+    if (showSettings) {
+      loadSyncStatus();
+    }
+  });
 
   onMount(() => {
     api.onEvent(handleEvent);
@@ -97,6 +108,48 @@
     } catch {
       discoveredPeers = [];
     }
+  }
+
+  async function loadSyncStatus() {
+    try {
+      syncStatus = await api.call('addressbook.sync_status');
+      const pending = await api.call('addressbook.get_pending_updates');
+      pendingUpdates = pending.updates || [];
+    } catch {
+      syncStatus = null;
+      pendingUpdates = [];
+    }
+  }
+
+  async function syncNow() {
+    await api.call('addressbook.sync_now');
+    await loadSyncStatus();
+  }
+
+  async function setSyncEnabled(enabled) {
+    syncStatus = await api.call('addressbook.enable_sync', { enabled });
+    await loadSyncStatus();
+  }
+
+  async function toggleAutoApply() {
+    if (!syncStatus) return;
+    syncStatus = await api.call('addressbook.enable_sync', {
+      enabled: true,
+      auto_apply: !syncStatus.auto_apply,
+    });
+    await loadSyncStatus();
+  }
+
+  async function applyPendingUpdate(id) {
+    await api.call('addressbook.apply_pending_update', { id });
+    await api.call('addressbook.reload');
+    await loadContacts();
+    await loadSyncStatus();
+  }
+
+  async function rejectPendingUpdate(id) {
+    await api.call('addressbook.reject_pending_update', { id });
+    await loadSyncStatus();
   }
 
   async function selectContact(contact) {
@@ -161,6 +214,9 @@
           content_hash: params.content_hash,
         };
       }
+    }
+    if (event === 'addressbook.sync_pending') {
+      loadSyncStatus();
     }
     if (event === 'discovery.updated') {
       discoveredPeers = params.peers || [];
@@ -335,6 +391,53 @@
           addressbookStatus = await api.call('addressbook.reload');
           await loadContacts();
         }}>Reload from disk</button>
+      {/if}
+
+      <h3 class="font-semibold pt-4">Address book sync</h3>
+      {#if syncStatus}
+        <div class="text-sm text-slate-400 space-y-2">
+          <p>{syncStatusLine}</p>
+          {#if !syncStatus.secret_configured}
+            <p class="text-xs text-amber-400/90">Configure <code class="text-slate-300">addressbook.sync.secret</code> in config before enabling sync.</p>
+          {/if}
+          {#if pendingUpdates.length}
+            <ul class="text-xs space-y-2">
+              {#each pendingUpdates as update (update.id)}
+                <li class="rounded bg-slate-800/80 p-2">
+                  <p>{formatPendingUpdate(update)}</p>
+                  <div class="flex gap-2 mt-2">
+                    <button class="text-emerald-400" onclick={() => applyPendingUpdate(update.id)}>Apply</button>
+                    <button class="text-rose-400" onclick={() => rejectPendingUpdate(update.id)}>Reject</button>
+                  </div>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button
+            class="rounded bg-slate-800 px-3 py-2 text-sm disabled:opacity-40"
+            disabled={!syncStatus.secret_configured || !syncStatus.enabled}
+            onclick={syncNow}
+          >Sync now</button>
+          <button
+            class="rounded bg-slate-800 px-3 py-2 text-sm disabled:opacity-40"
+            disabled={!syncStatus.secret_configured || syncStatus.enabled}
+            onclick={() => setSyncEnabled(true)}
+          >Enable sync</button>
+          <button
+            class="rounded bg-slate-800 px-3 py-2 text-sm disabled:opacity-40"
+            disabled={!syncStatus.enabled}
+            onclick={() => setSyncEnabled(false)}
+          >Disable sync</button>
+          <button
+            class="rounded bg-slate-800 px-3 py-2 text-sm disabled:opacity-40"
+            disabled={!syncStatus.enabled}
+            onclick={toggleAutoApply}
+          >Auto-apply: {syncStatus.auto_apply ? 'on' : 'off'}</button>
+        </div>
+      {:else}
+        <p class="text-sm text-slate-500">Loading sync status…</p>
       {/if}
 
       <h3 class="font-semibold pt-4 hidden sm:block">Service</h3>
