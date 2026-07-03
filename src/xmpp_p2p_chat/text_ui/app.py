@@ -12,14 +12,19 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Footer, Header, Input, Label, ListItem, ListView, Static
 
-from xmpp_p2p_chat.common.addressbook_hash import render_hash_grid_rich
 from xmpp_p2p_chat.common.api_client import APIClient
 from xmpp_p2p_chat.common.config import load_config
+from xmpp_p2p_chat.text_ui.display import (
+    filter_contacts,
+    format_contact_summary,
+    format_hash_sidebar,
+    format_message_log,
+    presence_symbol,
+    transport_label,
+)
 from xmpp_p2p_chat.text_ui.screens.addressbook import (
     AddContactScreen,
     AddressBookScreen,
-    presence_symbol,
-    transport_label,
 )
 
 logger = logging.getLogger(__name__)
@@ -199,38 +204,32 @@ class ChatApp(App):
             self.query_one("#status-bar", Static).update(f"[red]Error: {exc}[/]")
 
     def _update_contact_summary(self) -> None:
-        count = len(self.contacts)
-        version = self.addressbook_status.get("version", "?")
         warnings = len(self.health.get("warnings") or []) + len(
             self.addressbook_status.get("warnings") or []
         )
-        warn = f" · [yellow]{warnings} warn[/]" if warnings else ""
-        online = sum(1 for c in self.contacts if self.presence.get(c["id"], {}).get("show") == "available")
+        online = sum(
+            1 for c in self.contacts if self.presence.get(c["id"], {}).get("show") == "available"
+        )
         self.query_one("#contact-summary", Static).update(
-            f"v{version} · {count} contacts · {online} online{warn}"
+            format_contact_summary(
+                version=self.addressbook_status.get("version", "?"),
+                contact_count=len(self.contacts),
+                online_count=online,
+                warning_count=warnings,
+            )
         )
 
     def _update_hash_display(self) -> None:
         widget = self.query_one("#addressbook-hash", Static)
-        content_hash = self.addressbook_status.get("content_hash", "")
-        if not content_hash:
-            widget.update("")
-            return
-        short = content_hash.replace("SHA256:", "")[:12]
-        widget.update(
-            f"[dim]Book hash {short}…[/]\n" + render_hash_grid_rich(content_hash, grid=8)
-        )
+        widget.update(format_hash_sidebar(self.addressbook_status.get("content_hash", "")))
 
     async def _render_contacts(self) -> None:
         list_view = self.query_one("#contact-list", ListView)
         await list_view.clear()
-        needle = self.contact_filter.lower()
-        for contact in self.contacts:
+        for contact in filter_contacts(self.contacts, self.contact_filter):
+            cid = contact["id"]
             name = contact.get("name", "?")
             jid = contact.get("jid", "?")
-            if needle and needle not in name.lower() and needle not in jid.lower():
-                continue
-            cid = contact["id"]
             pres = self.presence.get(cid, {})
             show = pres.get("show", "offline")
             sym = presence_symbol(show)
@@ -279,32 +278,11 @@ class ChatApp(App):
 
     async def _render_messages(self) -> None:
         log = self.query_one("#chat-log", Static)
-        if not self.messages:
-            log.update("[dim]No messages yet. Say hello![/]")
-            return
-        lines = []
-        for msg in self.messages:
-            ts = msg.get("timestamp", "")
-            if isinstance(ts, str) and "T" in ts:
-                try:
-                    ts = datetime.fromisoformat(ts.replace("Z", "+00:00")).strftime("%H:%M")
-                except ValueError:
-                    ts = ts[:5] if len(ts) >= 5 else ts
-            direction = msg.get("direction", "in")
-            name = "You" if direction == "out" else (self.current_contact or {}).get("name", "Peer")
-            style = "msg-out" if direction == "out" else "msg-in"
-            status = msg.get("status", "")
-            marker = " [green]✓[/]" if status in ("delivered", "sent") else (
-                " [yellow]…[/]" if status == "pending" else ""
-            )
-            align = "right" if direction == "out" else "left"
-            lines.append(
-                f"[{style}][{align}][dim]{ts}[/dim] {name}:[/{align}]\n"
-                f"[{style}][{align}]{msg['body']}{marker}[/{align}][/{style}]"
-            )
-        log.update("\n\n".join(lines))
-        scroll = self.query_one("#chat-scroll", VerticalScroll)
-        scroll.scroll_end(animate=False)
+        peer = (self.current_contact or {}).get("name", "Peer")
+        log.update(format_message_log(self.messages, peer_name=peer))
+        if self.messages:
+            scroll = self.query_one("#chat-scroll", VerticalScroll)
+            scroll.scroll_end(animate=False)
 
     @on(Input.Submitted, "#message-input")
     async def on_message_submit(self, event: Input.Submitted) -> None:

@@ -12,6 +12,7 @@ from uuid import uuid4
 import websockets
 
 from xmpp_p2p_chat.common.models import Contact, HealthStatus
+from xmpp_p2p_chat.common.structured_logging import log_event
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,13 @@ class RpcServer:
         if not token_required:
             self._authenticated.add(websocket)
         logger.info("Client connected (%d total)", len(self.clients))
+        log_event(
+            logger,
+            logging.INFO,
+            "rpc.client.connected",
+            client_count=len(self.clients),
+            auth_required=token_required,
+        )
         try:
             async for raw in websocket:
                 try:
@@ -68,6 +76,12 @@ class RpcServer:
             self.clients.discard(websocket)
             self._authenticated.discard(websocket)
             logger.info("Client disconnected (%d remaining)", len(self.clients))
+            log_event(
+                logger,
+                logging.INFO,
+                "rpc.client.disconnected",
+                client_count=len(self.clients),
+            )
 
     async def _handle_request(self, websocket: ClientConnection, message: dict) -> None:
         req_id = message.get("id")
@@ -82,6 +96,13 @@ class RpcServer:
             await self._send_error(websocket, req_id, exc.code, exc.message, exc.data)
         except Exception as exc:  # noqa: BLE001
             logger.exception("RPC error for %s", method)
+            log_event(
+                logger,
+                logging.ERROR,
+                "rpc.error",
+                method=method,
+                error=str(exc),
+            )
             await self._send_error(websocket, req_id, -32603, str(exc))
 
     async def _dispatch(self, method: str, params: dict) -> Any:

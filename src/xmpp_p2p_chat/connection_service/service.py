@@ -12,6 +12,7 @@ import websockets
 
 from xmpp_p2p_chat.common.config import AppConfig, load_config
 from xmpp_p2p_chat.common.paths import bundled_addressbook_path
+from xmpp_p2p_chat.common.structured_logging import log_event, setup_logging
 from xmpp_p2p_chat.connection_service.addressbook import AddressBookManager
 from xmpp_p2p_chat.connection_service.api import RpcServer
 from xmpp_p2p_chat.connection_service.persistence import PersistenceManager
@@ -82,10 +83,7 @@ class ConnectionService:
         return find_web_ui_dist()
 
     async def start(self) -> None:
-        logging.basicConfig(
-            level=getattr(logging, self.config.log_level.upper(), logging.INFO),
-            format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-        )
+        setup_logging(self.config)
 
         self.addressbook.process_startup(
             bundled_path=self._resolve_bundled_addressbook(),
@@ -109,6 +107,16 @@ class ConnectionService:
             port,
             len(self.addressbook.contacts),
         )
+        log_event(
+            logger,
+            logging.INFO,
+            "service.start",
+            api_host=host,
+            api_port=port,
+            contact_count=len(self.addressbook.contacts),
+            addressbook_version=self.addressbook.version,
+            content_hash=self.addressbook.content_hash[:32],
+        )
 
         if self.config.ui.serve_web:
             web_root = self._resolve_web_root()
@@ -128,6 +136,7 @@ class ConnectionService:
         await self._shutdown_event.wait()
 
     async def shutdown(self) -> None:
+        log_event(logger, logging.INFO, "service.shutdown")
         logger.info("Shutting down connection service...")
         if self._web_server:
             self._web_server.stop()

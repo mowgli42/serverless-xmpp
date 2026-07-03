@@ -69,6 +69,8 @@ class AppConfig:
     api_token: str = ""
     log_level: str = "INFO"
     log_file: str = ""
+    log_json_file: str = ""
+    log_ebk_stderr: bool = True
     enforce_tls: bool = True
     allow_self_signed_direct: bool = True
     xmpp: XMPPConfig = field(default_factory=XMPPConfig)
@@ -129,6 +131,8 @@ def load_config(path: Path | None = None) -> AppConfig:
         logging_cfg = data.get("logging", {})
         cfg.log_level = logging_cfg.get("level", cfg.log_level)
         cfg.log_file = logging_cfg.get("file", cfg.log_file)
+        cfg.log_json_file = logging_cfg.get("json_file", cfg.log_json_file)
+        cfg.log_ebk_stderr = bool(logging_cfg.get("ebk_stderr", cfg.log_ebk_stderr))
 
         security = data.get("security", {})
         cfg.enforce_tls = bool(security.get("enforce_tls", cfg.enforce_tls))
@@ -182,7 +186,7 @@ def save_default_config(path: Path | None = None) -> Path:
             "api_port": 8765,
             "api_token": "",
         },
-        "logging": {"level": "INFO", "file": ""},
+        "logging": {"level": "INFO", "file": "", "json_file": "", "ebk_stderr": True},
         "security": {"enforce_tls": True, "allow_self_signed_direct": True},
         "xmpp": {"jid": "", "password": "", "server": "", "port": 5222},
         "p2p": {

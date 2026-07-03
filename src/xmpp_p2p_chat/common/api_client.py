@@ -11,6 +11,8 @@ from uuid import uuid4
 
 import websockets
 
+from xmpp_p2p_chat.common.structured_logging import log_event
+
 logger = logging.getLogger(__name__)
 
 EventHandler = Callable[[str, dict], None]
@@ -44,6 +46,13 @@ class APIClient:
                 break
             except Exception as exc:  # noqa: BLE001
                 logger.warning("API connection lost: %s", exc)
+                log_event(
+                    logger,
+                    logging.WARNING,
+                    "ui.api.disconnected",
+                    error=str(exc),
+                    url=self.url,
+                )
                 self._connected.clear()
                 self._fail_pending(exc)
                 if self._should_run:

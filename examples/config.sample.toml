@@ -15,6 +15,8 @@ listen_port = 5223
 [logging]
 level = "INFO"
 file = ""
+json_file = ""       # Structured JSON for SigNoz / OTLP (e.g. ~/.local/share/xmpp-p2p-chat/service.json.log)
+ebk_stderr = true    # @ebk status lines on stderr for AI terminals (Chaterm, OpenClaw)
 
 [security]
 enforce_tls = true

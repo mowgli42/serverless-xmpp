@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { ChatAPI } from './lib/api.js';
   import HashGrid from './lib/HashGrid.svelte';
+  import { buildStatusLine, connectionStatusFromError, filterContacts, formatTime } from './lib/display.js';
 
   let api = $state(new ChatAPI());
   let contacts = $state([]);
@@ -20,13 +21,7 @@
   let sidebarOpen = $state(true);
   let newContact = $state({ id: '', jid: '', name: '', preferred_transport: 'direct-p2p', direct: { host: '127.0.0.1', port: 5224, public_key_fingerprint: '' } });
 
-  let filteredContacts = $derived(
-    contacts.filter((c) => {
-      const q = contactSearch.trim().toLowerCase();
-      if (!q) return true;
-      return c.name?.toLowerCase().includes(q) || c.jid?.toLowerCase().includes(q) || c.id?.toLowerCase().includes(q);
-    })
-  );
+  let filteredContacts = $derived(filterContacts(contacts, contactSearch));
 
   onMount(() => {
     api.onEvent(handleEvent);
@@ -58,16 +53,19 @@
       addressbookStatus = result.status || null;
       status = 'connected';
     } catch (e) {
-      status = `error: ${e.message}`;
+      status = connectionStatusFromError(e, false);
     }
   }
 
   async function refreshStatus() {
     try {
       connectionInfo = await api.call('connection.status');
-      const transports = connectionInfo.transports || [];
-      status = transports.map((t) => `${t.transport}:${t.state}`).join(' · ') || 'unknown';
       health = await api.call('system.health');
+      status = buildStatusLine(
+        connectionInfo.transports || [],
+        contacts.length,
+        health?.pending_outbox || 0,
+      );
     } catch {
       status = 'disconnected';
     }
@@ -153,12 +151,7 @@
     }
   }
 
-  function formatTime(ts) {
-    if (!ts) return '';
-    return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-
-  function presenceColor(id) {
+  function presenceDotColor(id) {
     const show = presence[id]?.show || 'offline';
     return show === 'available' ? 'bg-emerald-400' : show === 'away' ? 'bg-amber-400' : 'bg-slate-500';
   }
@@ -217,7 +210,7 @@
             onclick={() => selectContact(contact)}
             aria-current={selectedId === contact.id ? 'true' : undefined}
           >
-            <span class="w-2 h-2 rounded-full {presenceColor(contact.id)}" aria-hidden="true"></span>
+            <span class="w-2 h-2 rounded-full {presenceDotColor(contact.id)}" aria-hidden="true"></span>
             <div>
               <div class="font-medium">{contact.name}</div>
               <div class="text-xs text-slate-400">{contact.jid}</div>

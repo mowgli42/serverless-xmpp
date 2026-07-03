@@ -1,4 +1,6 @@
 <script>
+  import { hashCells } from './display.js';
+
   /** @type {{ contentHash?: string, hashBlocks?: string[], grid?: number, showHex?: boolean }} */
   let {
     contentHash = '',
@@ -11,20 +13,7 @@
     contentHash.startsWith('SHA256:') ? contentHash.slice(7) : contentHash
   );
 
-  let cells = $derived(
-    hashBlocks.length >= grid * grid
-      ? hashBlocks.slice(0, grid * grid)
-      : hex.split('').map((ch) => {
-          const n = parseInt(ch, 16);
-          const palette = [
-            '#1e1e2e', '#45475a', '#585b70', '#6c7086',
-            '#f38ba8', '#fab387', '#f9e2af', '#a6e3a1',
-            '#94e2d5', '#89b4fa', '#cba6f7', '#f5c2e7',
-            '#b4befe', '#74c7ec', '#89dceb', '#a6adc8',
-          ];
-          return palette[n] || '#45475a';
-        }).slice(0, grid * grid)
-  );
+  let cells = $derived(hashCells(contentHash, hashBlocks, grid));
 </script>
 
 <div class="hash-panel" aria-label="Address book content fingerprint">

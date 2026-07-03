@@ -11,44 +11,12 @@ from textual.widgets import Button, DataTable, Footer, Input, Label, Static
 
 from xmpp_p2p_chat.common.addressbook_hash import render_hash_grid_rich
 from xmpp_p2p_chat.common.api_client import APIClient
-
-
-def presence_symbol(show: str) -> str:
-    return {"available": "●", "away": "◐", "busy": "◉", "offline": "○"}.get(show, "○")
-
-
-def transport_label(contact: dict) -> str:
-    transport = contact.get("preferred_transport", "xmpp-server")
-    if transport == "direct-p2p":
-        direct = contact.get("direct") or {}
-        return f"P2P {direct.get('host', '?')}:{direct.get('port', '?')}"
-    server = contact.get("xmpp_server") or "auto"
-    return f"XMPP ({server})"
-
-
-def format_contact_detail(contact: dict, presence: dict) -> str:
-    pres = presence.get(contact.get("id", ""), {})
-    show = pres.get("show", "offline")
-    status = pres.get("status", "")
-    lines = [
-        f"[bold]{contact.get('name', '?')}[/]  ({contact.get('id', '?')})",
-        f"JID: [cyan]{contact.get('jid', '?')}[/]",
-        f"Transport: {transport_label(contact)}",
-        f"Presence: {presence_symbol(show)} {show}" + (f" — {status}" if status else ""),
-    ]
-    tags = contact.get("tags") or []
-    if tags:
-        lines.append(f"Tags: {', '.join(tags)}")
-    notes = contact.get("notes") or ""
-    if notes:
-        lines.append(f"Notes: {notes}")
-    direct = contact.get("direct")
-    if direct:
-        fp = direct.get("public_key_fingerprint")
-        lines.append(f"Direct: {direct.get('host')}:{direct.get('port')}")
-        if fp:
-            lines.append(f"Fingerprint: [dim]{fp[:48]}…[/]" if len(fp) > 48 else f"Fingerprint: {fp}")
-    return "\n".join(lines)
+from xmpp_p2p_chat.text_ui.display import (
+    format_addressbook_status_panel,
+    format_contact_detail,
+    presence_symbol,
+    transport_label,
+)
 
 
 class ConfirmScreen(ModalScreen[bool]):
@@ -295,38 +263,17 @@ class AddressBookScreen(ModalScreen[str | None]):
         self._render_detail(None)
 
     def _render_status(self) -> None:
-        ok = self.health.get("ok", True)
-        count = self.ab_status.get("contact_count", len(self.contacts))
-        version = self.ab_status.get("version", 0)
-        content_hash = self.ab_status.get("content_hash", "")
-        warnings = (self.ab_status.get("warnings") or []) + (self.health.get("warnings") or [])
-        outbox = self.health.get("pending_outbox", 0)
-        uptime = int(self.health.get("uptime_seconds", 0))
-        transports = self.connection.get("transports") or []
-        transport_line = " · ".join(
-            f"{t.get('transport', '?')}:{t.get('state', '?')}" for t in transports
-        ) or "no transports"
-        fp = self.connection.get("p2p_fingerprint")
-        fp_line = ""
-        if fp:
-            fp_line = f"\nP2P fingerprint: [dim]{fp[:44]}…[/]" if len(fp) > 44 else f"\nP2P fingerprint: {fp}"
-
-        status_icon = "[green]✓ OK[/]" if ok and not warnings else "[yellow]⚠ Issues[/]"
-        warn_block = ""
-        if warnings:
-            warn_block = "\n[yellow]" + "\n".join(f"• {w}" for w in warnings[:4]) + "[/]"
-            if len(warnings) > 4:
-                warn_block += f"\n[dim]…and {len(warnings) - 4} more warnings[/]"
-
-        primary = self.ab_status.get("primary_path", "")
-        path_line = f"\n[dim]File: {primary}[/]" if primary else ""
-
         self.query_one("#ab-status", Static).update(
-            f"{status_icon}  [bold]v{version}[/] · {count} contacts · outbox {outbox} · uptime {uptime}s\n"
-            f"Transports: {transport_line}{fp_line}{path_line}{warn_block}"
+            format_addressbook_status_panel(
+                health=self.health,
+                ab_status=self.ab_status,
+                connection=self.connection,
+                contact_count=len(self.contacts),
+            )
         )
 
         hash_widget = self.query_one("#ab-hash", Static)
+        content_hash = self.ab_status.get("content_hash", "")
         if content_hash:
             short = content_hash.replace("SHA256:", "")[:16]
             hash_widget.update(
