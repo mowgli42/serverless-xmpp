@@ -81,7 +81,7 @@ class TestTuiDataFailures:
         app.health = mock_api.responses["system.health"]
 
         async with app.run_test(size=(120, 40)):
-            app._update_contact_summary()
+            app._update_sidebar_header()
             summary = str(app.query_one("#contact-summary", Static).content)
             assert "warn" in summary
 

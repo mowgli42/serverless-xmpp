@@ -15,10 +15,14 @@ from textual.widgets import Footer, Header, Input, Label, ListItem, ListView, St
 from xmpp_p2p_chat.common.api_client import APIClient
 from xmpp_p2p_chat.common.config import load_config
 from xmpp_p2p_chat.text_ui.display import (
-    filter_contacts,
+    find_local_contact,
     format_contact_summary,
-    format_hash_sidebar,
+    format_hash_awaiting,
+    format_hash_compact,
+    format_local_identity,
     format_message_log,
+    is_transport_connected,
+    prepare_contact_list,
     presence_symbol,
     transport_label,
 )
@@ -56,10 +60,20 @@ class ChatApp(App):
         color: $text-muted;
         padding: 0 0 0 0;
     }
+    #local-identity {
+        height: auto;
+        padding: 0 0 0 0;
+        color: $text;
+    }
     #addressbook-hash {
         height: auto;
         padding: 0 0 1 0;
         color: $text-muted;
+    }
+    #sort-hint {
+        color: $text-muted;
+        padding: 0 1;
+        height: auto;
     }
     #contact-filter {
         margin: 0 1 1 1;
@@ -137,6 +151,7 @@ class ChatApp(App):
         Binding("n", "new_contact", "New contact"),
         Binding("slash", "focus_input", "Message"),
         Binding("r", "refresh_contacts", "Refresh"),
+        Binding("s", "toggle_sort", "Sort"),
         Binding("question_mark", "show_help", "Help"),
     ]
 
@@ -156,6 +171,9 @@ class ChatApp(App):
         self.current_contact: dict | None = None
         self.messages: list[dict] = []
         self.contact_filter: str = ""
+        self.connection_info: dict = {}
+        self.local_jid: str = ""
+        self.sort_mode: str = "status"
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -164,7 +182,9 @@ class ChatApp(App):
                 with Vertical(id="sidebar-header"):
                     yield Label("Contacts", id="contacts-title")
                     yield Static("Loading…", id="contact-summary")
+                    yield Static("", id="local-identity")
                     yield Static("", id="addressbook-hash")
+                yield Static("[dim]Sort: status[/] · [dim]s[/] toggle", id="sort-hint")
                 yield Input(placeholder="Search name or JID…", id="contact-filter")
                 yield ListView(id="contact-list")
             with Vertical(id="main-pane"):
@@ -197,13 +217,17 @@ class ChatApp(App):
                 self.health = await self.client.call("system.health")
             except Exception:
                 self.health = {}
+            try:
+                self.connection_info = await self.client.call("connection.status")
+                self.local_jid = self.connection_info.get("local_jid", "")
+            except Exception:
+                self.connection_info = {}
             await self._render_contacts()
-            self._update_contact_summary()
-            self._update_hash_display()
+            self._update_sidebar_header()
         except Exception as exc:  # noqa: BLE001
             self.query_one("#status-bar", Static).update(f"[red]Error: {exc}[/]")
 
-    def _update_contact_summary(self) -> None:
+    def _update_sidebar_header(self) -> None:
         warnings = len(self.health.get("warnings") or []) + len(
             self.addressbook_status.get("warnings") or []
         )
@@ -218,15 +242,30 @@ class ChatApp(App):
                 warning_count=warnings,
             )
         )
-
-    def _update_hash_display(self) -> None:
-        widget = self.query_one("#addressbook-hash", Static)
-        widget.update(format_hash_sidebar(self.addressbook_status.get("content_hash", "")))
+        local_contact = find_local_contact(self.contacts, self.local_jid) if self.local_jid else None
+        self.query_one("#local-identity", Static).update(
+            format_local_identity(self.local_jid or "…", local_contact)
+        )
+        content_hash = self.addressbook_status.get("content_hash", "")
+        hash_widget = self.query_one("#addressbook-hash", Static)
+        if is_transport_connected(self.connection_info):
+            hash_widget.update(format_hash_compact(content_hash))
+        else:
+            hash_widget.update(format_hash_awaiting(content_hash))
+        sort_label = "name" if self.sort_mode == "name" else "status"
+        self.query_one("#sort-hint", Static).update(
+            f"[dim]Sort: {sort_label}[/] · [dim]s[/] toggle"
+        )
 
     async def _render_contacts(self) -> None:
         list_view = self.query_one("#contact-list", ListView)
         await list_view.clear()
-        for contact in filter_contacts(self.contacts, self.contact_filter):
+        for contact in prepare_contact_list(
+            self.contacts,
+            self.presence,
+            needle=self.contact_filter,
+            sort_mode=self.sort_mode,
+        ):
             cid = contact["id"]
             name = contact.get("name", "?")
             jid = contact.get("jid", "?")
@@ -322,24 +361,23 @@ class ChatApp(App):
         elif event in ("presence.updated", "addressbook.updated"):
             self.call_from_thread(self._load_contacts)
         elif event == "connection.changed":
-            state = params.get("state", "unknown")
-            self.call_from_thread(
-                lambda: self.query_one("#status-bar", Static).update(
-                    f"Transport: {state} · {len(self.contacts)} contacts"
-                )
-            )
+            self.call_from_thread(self._refresh_connection_sync)
 
     def _render_messages_sync(self) -> None:
         asyncio.create_task(self._render_messages())
 
+    def _refresh_connection_sync(self) -> None:
+        asyncio.create_task(self._refresh_status())
+
     async def _refresh_status(self) -> None:
         try:
-            result = await self.client.call("connection.status")
-            transports = result.get("transports", [])
+            self.connection_info = await self.client.call("connection.status")
+            self.local_jid = self.connection_info.get("local_jid", "")
+            transports = self.connection_info.get("transports", [])
             parts = [f"{t.get('transport', '?')}:{t.get('state', '?')}" for t in transports]
             health = await self.client.call("system.health")
             self.health = health
-            self._update_contact_summary()
+            self._update_sidebar_header()
             outbox = health.get("pending_outbox", 0)
             line = f"{' · '.join(parts)} · {len(self.contacts)} contacts"
             if outbox:
@@ -363,9 +401,14 @@ class ChatApp(App):
             self._load_contacts()
             self.notify(f"Added contact: {result}")
 
+    def action_toggle_sort(self) -> None:
+        self.sort_mode = "name" if self.sort_mode == "status" else "status"
+        asyncio.create_task(self._render_contacts())
+        self._update_sidebar_header()
+
     def action_show_help(self) -> None:
         self.notify(
-            "a=address book · n=new contact · c=contacts · /=message · r=refresh · ?=help",
+            "a=address book · n=new contact · c=contacts · s=sort · /=message · r=refresh · ?=help",
             title="Keyboard shortcuts",
             timeout=10,
         )

@@ -56,7 +56,77 @@ def format_contact_summary(
     return f"v{version} · {contact_count} contacts · {online_count} online{warn}"
 
 
-def format_hash_sidebar(content_hash: str, *, grid: int = 8, short_len: int = 12) -> str:
+PRESENCE_SORT_ORDER = {"available": 0, "away": 1, "busy": 2, "offline": 3}
+
+
+def find_local_contact(contacts: list[dict], local_jid: str) -> dict | None:
+    needle = local_jid.lower()
+    for contact in contacts:
+        if contact.get("jid", "").lower() == needle:
+            return contact
+    return None
+
+
+def is_transport_connected(connection: dict | None) -> bool:
+    if not connection:
+        return False
+    return any(t.get("state") == "connected" for t in connection.get("transports") or [])
+
+
+def format_local_identity(local_jid: str, local_contact: dict | None = None) -> str:
+    if local_contact:
+        name = local_contact.get("name", local_jid)
+        return f"[bold]You:[/] {name} [dim]({local_jid})[/]"
+    return f"[bold]You:[/] [cyan]{local_jid}[/] [dim]· not listed in address book[/]"
+
+
+def format_hash_compact(content_hash: str, *, short_len: int = 12) -> str:
+    if not content_hash:
+        return ""
+    short = content_hash.replace("SHA256:", "")[:short_len]
+    return f"[dim]Book {short}…[/]"
+
+
+def format_hash_awaiting(content_hash: str, *, grid: int = 8) -> str:
+    if not content_hash:
+        return "[yellow]Awaiting connection[/] — loading address book…"
+    short = content_hash.replace("SHA256:", "")[:12]
+    return (
+        f"[yellow]Awaiting connection[/] — verify book hash [dim]{short}…[/]\n"
+        + render_hash_grid_rich(content_hash, grid=grid)
+    )
+
+
+def sort_contacts(
+    contacts: list[dict],
+    presence: dict[str, dict],
+    *,
+    mode: str = "status",
+) -> list[dict]:
+    if mode == "name":
+        return sorted(contacts, key=lambda c: c.get("name", "").lower())
+    return sorted(
+        contacts,
+        key=lambda c: (
+            PRESENCE_SORT_ORDER.get(presence.get(c["id"], {}).get("show", "offline"), 99),
+            c.get("name", "").lower(),
+        ),
+    )
+
+
+def prepare_contact_list(
+    contacts: list[dict],
+    presence: dict[str, dict],
+    *,
+    needle: str = "",
+    sort_mode: str = "status",
+) -> list[dict]:
+    filtered = filter_contacts(contacts, needle)
+    return sort_contacts(filtered, presence, mode=sort_mode)
+
+
+def format_hash_sidebar(content_hash: str, *, grid: int = 8, short_len: int = 16) -> str:
+    """Full hash grid for settings / address book screens."""
     if not content_hash:
         return ""
     short = content_hash.replace("SHA256:", "")[:short_len]
@@ -155,13 +225,21 @@ def filter_contacts(contacts: list[dict], needle: str) -> list[dict]:
 
 
 __all__ = [
+    "filter_contacts",
+    "find_local_contact",
     "format_addressbook_status_panel",
     "format_contact_detail",
     "format_contact_summary",
+    "format_hash_awaiting",
+    "format_hash_compact",
     "format_hash_sidebar",
+    "format_local_identity",
     "format_message_line",
     "format_message_log",
     "format_message_timestamp",
-    "filter_contacts",
+    "is_transport_connected",
+    "prepare_contact_list",
+    "presence_symbol",
+    "sort_contacts",
     "transport_label",
 ]

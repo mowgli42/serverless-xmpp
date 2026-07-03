@@ -171,7 +171,10 @@ class RpcServer:
 
         if method == "connection.status":
             statuses = svc.sessions.connection_status()
-            result = {"transports": [s.model_dump(mode="json") for s in statuses]}
+            result = {
+                "transports": [s.model_dump(mode="json") for s in statuses],
+                "local_jid": svc.config.effective_local_jid,
+            }
             fp = svc.sessions.p2p_fingerprint()
             if fp:
                 result["p2p_fingerprint"] = fp

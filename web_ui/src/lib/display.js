@@ -1,5 +1,7 @@
 /** Pure display helpers for the Web SPA (unit-testable). */
 
+const PRESENCE_SORT_ORDER = { available: 0, away: 1, busy: 2, offline: 3 };
+
 export function filterContacts(contacts, query) {
   const q = (query || '').trim().toLowerCase();
   if (!q) return contacts;
@@ -9,6 +11,54 @@ export function filterContacts(contacts, query) {
       c.jid?.toLowerCase().includes(q) ||
       c.id?.toLowerCase().includes(q),
   );
+}
+
+export function findLocalContact(contacts, localJid) {
+  if (!localJid) return null;
+  const needle = localJid.toLowerCase();
+  return contacts.find((c) => c.jid?.toLowerCase() === needle) || null;
+}
+
+export function isTransportConnected(connection) {
+  if (!connection?.transports?.length) return false;
+  return connection.transports.some((t) => t.state === 'connected');
+}
+
+export function isAwaitingConnection(connection) {
+  return !isTransportConnected(connection);
+}
+
+export function formatLocalIdentity(localJid, localContact = null) {
+  if (!localJid) return 'You: …';
+  if (localContact) {
+    return `You: ${localContact.name} (${localJid})`;
+  }
+  return `You: ${localJid} · not listed in address book`;
+}
+
+export function formatHashCompact(contentHash, shortLen = 12) {
+  if (!contentHash) return '';
+  const short = contentHash.replace('SHA256:', '').slice(0, shortLen);
+  return `Book ${short}…`;
+}
+
+export function sortContacts(contacts, presence, mode = 'status') {
+  const list = [...contacts];
+  if (mode === 'name') {
+    return list.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
+  }
+  return list.sort((a, b) => {
+    const aShow = presence[a.id]?.show || 'offline';
+    const bShow = presence[b.id]?.show || 'offline';
+    const orderDiff = (PRESENCE_SORT_ORDER[aShow] ?? 99) - (PRESENCE_SORT_ORDER[bShow] ?? 99);
+    if (orderDiff !== 0) return orderDiff;
+    return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+  });
+}
+
+export function prepareContactList(contacts, presence, { needle = '', sortMode = 'status' } = {}) {
+  const filtered = filterContacts(contacts, needle);
+  return sortContacts(filtered, presence, sortMode);
 }
 
 export function presenceColor(show) {

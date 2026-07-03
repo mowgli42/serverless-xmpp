@@ -88,6 +88,7 @@ def mock_api() -> MockAPIClient:
         "connection.status": {
             "transports": [{"transport": "direct-p2p", "state": "connected"}],
             "p2p_fingerprint": "SHA256:deadbeef",
+            "local_jid": "alice@p2p.local",
         },
         "chat.start": {"chat_id": "bob", "transport": "direct-p2p"},
         "chat.get_history": {"messages": []},

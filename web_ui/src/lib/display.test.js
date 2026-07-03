@@ -6,6 +6,13 @@ import {
   buildStatusLine,
   connectionStatusFromError,
   hashCells,
+  findLocalContact,
+  formatLocalIdentity,
+  formatHashCompact,
+  isAwaitingConnection,
+  isTransportConnected,
+  sortContacts,
+  prepareContactList,
 } from './display.js';
 
 describe('filterContacts', () => {
@@ -72,5 +79,45 @@ describe('hashCells', () => {
   it('derives from hex when blocks missing', () => {
     const cells = hashCells('SHA256:' + 'a'.repeat(64), [], 8);
     expect(cells).toHaveLength(64);
+  });
+});
+
+describe('connection-aware display', () => {
+  const contacts = [
+    { id: 'bob', name: 'Bob', jid: 'bob@p2p.local' },
+    { id: 'carol', name: 'Carol', jid: 'carol@p2p.local' },
+  ];
+  const presence = {
+    bob: { show: 'available' },
+    carol: { show: 'offline' },
+  };
+
+  it('finds local contact by jid', () => {
+    expect(findLocalContact(contacts, 'bob@p2p.local')?.name).toBe('Bob');
+  });
+
+  it('formats local identity', () => {
+    expect(formatLocalIdentity('bob@p2p.local', contacts[0])).toContain('Bob');
+    expect(formatLocalIdentity('ghost@p2p.local')).toContain('not listed');
+  });
+
+  it('detects awaiting connection', () => {
+    expect(isAwaitingConnection({ transports: [{ state: 'connecting' }] })).toBe(true);
+    expect(isTransportConnected({ transports: [{ state: 'connected' }] })).toBe(true);
+  });
+
+  it('sorts by status then name', () => {
+    const ordered = sortContacts(contacts, presence, 'status');
+    expect(ordered[0].id).toBe('bob');
+  });
+
+  it('prepares filtered sorted list', () => {
+    const list = prepareContactList(contacts, presence, { needle: 'car', sortMode: 'name' });
+    expect(list).toHaveLength(1);
+    expect(list[0].id).toBe('carol');
+  });
+
+  it('formats compact hash', () => {
+    expect(formatHashCompact('SHA256:' + 'ab'.repeat(32))).toContain('Book abababababab');
   });
 });

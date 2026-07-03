@@ -2,7 +2,16 @@
   import { onMount } from 'svelte';
   import { ChatAPI } from './lib/api.js';
   import HashGrid from './lib/HashGrid.svelte';
-  import { buildStatusLine, connectionStatusFromError, filterContacts, formatTime } from './lib/display.js';
+  import {
+    buildStatusLine,
+    connectionStatusFromError,
+    findLocalContact,
+    formatHashCompact,
+    formatLocalIdentity,
+    formatTime,
+    isAwaitingConnection,
+    prepareContactList,
+  } from './lib/display.js';
 
   let api = $state(new ChatAPI());
   let contacts = $state([]);
@@ -17,11 +26,18 @@
   let connectionInfo = $state(null);
   let discoveredPeers = $state([]);
   let contactSearch = $state('');
+  let sortMode = $state('status');
   let showSettings = $state(false);
   let sidebarOpen = $state(true);
   let newContact = $state({ id: '', jid: '', name: '', preferred_transport: 'direct-p2p', direct: { host: '127.0.0.1', port: 5224, public_key_fingerprint: '' } });
 
-  let filteredContacts = $derived(filterContacts(contacts, contactSearch));
+  let localJid = $derived(connectionInfo?.local_jid || '');
+  let localContact = $derived(findLocalContact(contacts, localJid));
+  let localIdentity = $derived(formatLocalIdentity(localJid, localContact));
+  let awaitingConnection = $derived(isAwaitingConnection(connectionInfo));
+  let filteredContacts = $derived(
+    prepareContactList(contacts, presence, { needle: contactSearch, sortMode }),
+  );
 
   onMount(() => {
     api.onEvent(handleEvent);
@@ -183,24 +199,38 @@
       <h1 class="text-lg font-semibold">Serverless XMPP</h1>
       <p class="text-xs text-emerald-500/80">Local service mode</p>
       <p class="text-xs text-slate-400 truncate" title={status}>{status}</p>
+      <p class="text-xs text-slate-200 mt-2 font-medium">{localIdentity}</p>
       {#if addressbookStatus}
         <p class="text-xs text-slate-500 mt-1">
           Address book v{addressbookStatus.version} · {addressbookStatus.contact_count} contacts
         </p>
-        <HashGrid
-          contentHash={addressbookStatus.content_hash}
-          hashBlocks={addressbookStatus.hash_blocks}
-          grid={8}
-        />
+        {#if awaitingConnection}
+          <p class="text-xs text-amber-400/90 mt-1">Awaiting connection — verify book hash</p>
+          <HashGrid
+            contentHash={addressbookStatus.content_hash}
+            hashBlocks={addressbookStatus.hash_blocks}
+            grid={8}
+          />
+        {:else}
+          <p class="text-xs text-slate-500 mt-1">{formatHashCompact(addressbookStatus.content_hash)}</p>
+        {/if}
       {/if}
     </header>
-    <div class="p-3">
+    <div class="p-3 space-y-2">
       <input
         class="w-full rounded bg-slate-800 px-3 py-2 text-sm"
         placeholder="Search contacts..."
         bind:value={contactSearch}
         aria-label="Search contacts"
       />
+      <button
+        type="button"
+        class="text-xs text-slate-400 hover:text-slate-200"
+        onclick={() => (sortMode = sortMode === 'status' ? 'name' : 'status')}
+        aria-label="Toggle contact sort order"
+      >
+        Sort: {sortMode === 'status' ? 'connection status' : 'name'}
+      </button>
     </div>
     <ul class="flex-1 overflow-y-auto" role="list">
       {#each filteredContacts as contact (contact.id)}
