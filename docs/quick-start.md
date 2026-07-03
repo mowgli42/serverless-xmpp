@@ -123,10 +123,11 @@ Trusted groups can push signed contact updates over XMPP server transport. See [
 ## Multi-Client Testing
 
 ```bash
-./scripts/test-multi-client.sh test-rpc    # API tests
-./scripts/test-multi-client.sh test-p2p    # direct P2P tests
-./scripts/test-multi-client.sh setup       # Prosody + accounts
-./scripts/test-multi-client.sh init-alice  # XMPP server two-user flow
+./scripts/test-multi-client.sh test-rpc       # API tests
+./scripts/test-multi-client.sh test-p2p       # direct P2P unit tests
+FRESH=1 ./scripts/test-multi-client.sh test-p2p-live  # live two-peer P2P messaging
+./scripts/test-multi-client.sh setup          # Prosody + accounts
+./scripts/test-multi-client.sh init-alice     # XMPP server two-user flow
 ```
 
 Full guide: [multi-client-testing.md](./multi-client-testing.md) · P2P: [p2p-serverless.md](./p2p-serverless.md)

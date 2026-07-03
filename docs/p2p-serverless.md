@@ -30,19 +30,23 @@ pip install -e ".[dev]"
 ./scripts/test-multi-client.sh init-p2p-bob
 
 # Terminal 1 — start alice (generates cert on first run)
-DATA_ROOT=.test-data XDG_CONFIG_HOME=.test-data/p2p-alice/config \
-  XDG_DATA_HOME=.test-data/p2p-alice/data \
-  python -m xmpp_p2p_chat.connection_service
+./scripts/test-multi-client.sh service-p2p-alice
 
 # Terminal 2 — start bob
-DATA_ROOT=.test-data XDG_CONFIG_HOME=.test-data/p2p-bob/config \
-  XDG_DATA_HOME=.test-data/p2p-bob/data \
-  python -m xmpp_p2p_chat.connection_service
+./scripts/test-multi-client.sh service-p2p-bob
 
 # Get fingerprints (after both services have started once)
 ./scripts/test-multi-client.sh p2p-fingerprints
 
 # Update each peer's addressbook.json with the other's fingerprint, then restart services.
+```
+
+### Automated live test
+
+To spin up both peers, exchange fingerprints, and verify bidirectional messaging in one step:
+
+```bash
+FRESH=1 ./scripts/test-multi-client.sh test-p2p-live
 ```
 
 ## Config Reference
