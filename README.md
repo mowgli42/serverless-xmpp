@@ -1,1 +1,1 @@
-# serverless-xmpp
+FULL_README_CONTENT
