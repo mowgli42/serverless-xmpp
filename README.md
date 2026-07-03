@@ -51,7 +51,7 @@ cd web_ui && npm install && npm run build
 # Service auto-serves web_ui/dist when [ui] serve_web = true
 ```
 
-Full details: [docs/quick-start.md](docs/quick-start.md) · **Serverless P2P**: [docs/p2p-serverless.md](docs/p2p-serverless.md)
+Full details: [docs/quick-start.md](docs/quick-start.md) · **Architecture**: [docs/architecture.md](docs/architecture.md) · **Serverless P2P**: [docs/p2p-serverless.md](docs/p2p-serverless.md)
 
 ## Serverless P2P (No XMPP Server)
 
