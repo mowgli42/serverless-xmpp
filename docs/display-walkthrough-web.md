@@ -23,13 +23,18 @@ python -m xmpp_p2p_chat.connection_service
 │ Header: status line · settings toggle                    │
 ├──────────────┬──────────────────────────────────────────┤
 │ Sidebar      │ Chat header (selected contact)             │
-│ · Search     │ Message list (bubbles)                   │
-│ · HashGrid   │ Composer (Enter / Ctrl+Enter to send)    │
+│ · You: identity│ Message list (bubbles)                   │
+│ · Search     │ Composer (Enter / Ctrl+Enter to send)    │
+│ · Sort toggle│                                          │
+│ · HashGrid*  │                                          │
 │ · Contacts   │                                          │
 ├──────────────┴──────────────────────────────────────────┤
-│ Settings panel (optional): hash, reload, add contact,   │
-│ discovery peers, health, reconnect                      │
+│ Settings panel (optional): full hash grid, reload,      │
+│ add contact, discovery peers, health, reconnect         │
 └─────────────────────────────────────────────────────────┘
+
+* HashGrid in sidebar only while awaiting transport connection.
+  When connected, sidebar shows a compact hash prefix instead.
 ```
 
 ---
@@ -41,13 +46,16 @@ python -m xmpp_p2p_chat.connection_service
 1. Page loads → WebSocket to `ws://127.0.0.1:8765/rpc`.
 2. `waitForService()` polls until connected (max ~7.5s).
 3. `addressbook.list` populates sidebar + `addressbookStatus` (version, hash).
+4. `connection.status` provides `local_jid` for the **You:** identity line.
 
-**Expected status:** `connected` then transport line from `refreshStatus()` every 5s.
+**Expected status:** transport line from `refreshStatus()` every 5s. Sidebar hash grid appears only while no transport is connected.
 
 ### Step B — Select contact
 
-1. Click a contact in the sidebar (mobile: sidebar overlay).
-2. `chat.start` + `chat.get_history` load messages.
+1. Use **Search** to filter contacts by name or JID.
+2. Click **Sort: connection status / name** to toggle ordering (presence first by default).
+3. Click a contact in the sidebar (mobile: sidebar overlay).
+4. `chat.start` + `chat.get_history` load messages.
 
 ### Step C — Send message
 
@@ -56,7 +64,7 @@ python -m xmpp_p2p_chat.connection_service
 
 ### Step D — Settings panel
 
-- **HashGrid** — same 8×8 fingerprint as TUI (`HashGrid.svelte` + `display.js`).
+- **HashGrid** — full 8×8 fingerprint (always available here for verification).
 - **Reload from disk** — calls `addressbook.reload`.
 - **Add contact** — form → `addressbook.add`.
 - **Reconnect** — `connection.reconnect`.
@@ -71,6 +79,10 @@ Logic lives in `web_ui/src/lib/display.js`:
 | Function | Purpose |
 |----------|---------|
 | `filterContacts` | Sidebar search |
+| `prepareContactList` | Search + sort (status or name) |
+| `sortContacts` | Order by presence or alphabetical name |
+| `findLocalContact` / `formatLocalIdentity` | Match `local_jid` in address book |
+| `isAwaitingConnection` / `formatHashCompact` | Connection-aware hash display |
 | `formatTime` | Message timestamps |
 | `buildStatusLine` | Header transport + outbox summary |
 | `connectionStatusFromError` | `error: …` / `connecting` / `connected` |

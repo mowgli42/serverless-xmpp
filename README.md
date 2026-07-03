@@ -8,11 +8,11 @@ Uses pre-placed local address books to start peer-to-peer chats over **direct TL
 
 ## Key Features
 
-- **Pre-placed Address Books** — Local JSON files (human-editable) define your contacts. Version + SHA256 hash with visual 8×8 fingerprint grid in both UIs. Bundled default imported on first run.
+- **Pre-placed Address Books** — Local JSON files (human-editable) define your contacts. Version + SHA256 hash with visual 8×8 fingerprint grid **while awaiting connection**; compact hash prefix when connected. Bundled default imported on first run.
 - **Decoupled Architecture** — Connection Service handles all XMPP logic, transports, sessions, and persistence. UIs are thin clients.
 - **Multiple UIs**:
-  - Keyboard-first **Text TUI** (Textual) — chat, contact search, full address book screen (`a`), create/remove contacts, hash grid in sidebar.
-  - Modern **Web SPA** (Svelte + Vite + Tailwind) — rich chat experience, settings panel with address book hash and reload.
+  - Keyboard-first **Text TUI** (Textual) — chat, contact search/sort, local identity in sidebar, full address book screen (`a`), create/remove contacts.
+  - Modern **Web SPA** (Svelte + Vite + Tailwind) — rich chat experience, connection-aware sidebar, settings panel with full hash grid and reload.
 - **Serverless Operation** — Direct P2P over TLS without a central server; optional XMPP server client mode for Prosody/ejabberd.
 - **Offline Resilience** — Message queuing, local history (SQLite), automatic retry.
 - **Privacy & Security** — Local data only, TLS enforced, localhost-only API, no telemetry.
@@ -33,6 +33,7 @@ Regenerate with `./scripts/capture-screenshots.sh` (requires a running Connectio
 |-----|--------|
 | `a` | Open **Address Book** — list contacts, version, hash grid, file path |
 | `n` | **New contact** (from main screen or address book) |
+| `s` | Toggle contact sort (**presence status** ↔ **name**) |
 | `Delete` | Remove selected contact (address book screen) |
 | `r` | Refresh contacts / reload address book from disk |
 | `Enter` | Open chat with selected contact |
@@ -41,7 +42,10 @@ Regenerate with `./scripts/capture-screenshots.sh` (requires a running Connectio
 | `?` | Help overlay |
 | `q` | Quit TUI (service keeps running) |
 
-The sidebar shows contact count, address book **version** (`v{N}`), and an **8×8 color hash grid** so you can verify you have the latest distributed contact list.
+The sidebar shows **who you are** (matched from the address book via `local_jid`), contact count, address book **version** (`v{N}`), and:
+
+- **Awaiting connection** — full **8×8 color hash grid** to verify the distributed contact list before peers connect
+- **Connected** — compact hash prefix only; contacts sorted by presence (online first) with search and alphabetical sort toggle
 
 ## Quick Start
 

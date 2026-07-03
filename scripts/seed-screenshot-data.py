@@ -16,6 +16,14 @@ async def seed(data_dir: Path) -> None:
     data_dir.mkdir(parents=True, exist_ok=True)
     addressbook = [
         {
+            "id": "alice",
+            "jid": "alice@p2p.local",
+            "name": "Alice",
+            "tags": ["self"],
+            "preferred_transport": "direct-p2p",
+            "direct": {"host": "127.0.0.1", "port": 15299, "public_key_fingerprint": "SHA256:demo-alice"},
+        },
+        {
             "id": "bob",
             "jid": "bob@p2p.local",
             "name": "Bob",

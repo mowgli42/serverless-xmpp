@@ -21,6 +21,8 @@ def main() -> None:
         page.wait_for_timeout(3000)
         # Wait for contacts to load from WebSocket API
         page.wait_for_selector("text=Bob", timeout=20000)
+        page.wait_for_selector("text=You:", timeout=20000)
+        page.wait_for_selector("text=Book", timeout=20000)
         page.locator("button", has_text="Bob").first.click()
         page.wait_for_selector("text=Hey Alice", timeout=10000)
         page.wait_for_timeout(500)

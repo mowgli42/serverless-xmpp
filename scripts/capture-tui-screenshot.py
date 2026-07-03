@@ -25,13 +25,15 @@ class ScreenshotApp(ChatApp):
         self._load_contacts()
         for _ in range(30):
             await asyncio.sleep(0.5)
-            if self.contacts and self.addressbook_status.get("content_hash"):
+            if self.contacts and self.addressbook_status.get("content_hash") and self.connection_info:
                 break
 
+        self._update_sidebar_header()
+
         if self.contacts:
-            contact = self.contacts[0]
+            contact = next((c for c in self.contacts if c["id"] == "bob"), self.contacts[0])
             self.current_chat_id = contact["id"]
-            self.current_contact_name = contact["name"]
+            self.current_contact = contact
             self.query_one("#chat-title", Label).update(f"Chat with {contact['name']}")
             try:
                 await self._open_chat(contact["id"])
@@ -72,7 +74,9 @@ class ScreenshotApp(ChatApp):
                 label = f"[{'green' if show == 'available' else 'dim'}]●[/] {contact['name']}"
                 await list_view.append(ListItem(Label(label), id=f"contact-{contact['id']}"))
 
-        self.query_one("#status-bar", Static).update("direct-p2p:connected · 2 contacts")
+        self.query_one("#status-bar", Static).update(
+            f"direct-p2p:connected · {len(self.contacts or [])} contacts"
+        )
         await asyncio.sleep(0.5)
 
         svg_name = self.save_screenshot(filename="text-ui.svg", path=str(self._out_dir))

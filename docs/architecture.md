@@ -32,7 +32,7 @@ Contacts come from a **local address book** (JSON files), not from a server rost
 
 - **Pre-placed address books** — human-editable JSON; optional fragment files in `addressbooks.d/`
 - **Startup address book processing** — load, merge, bundled import, canonical hash, version tracking
-- **Visual hash fingerprint** — 8×8 color grid in TUI sidebar and Web UI settings (verify distribution integrity)
+- **Visual hash fingerprint** — 8×8 color grid while awaiting connection (sidebar) and in settings/address book screens; compact hash prefix when connected
 - **Direct P2P messaging** — inbound TLS listener + outbound connections; fingerprint pinning
 - **XMPP server mode** — connect to external server via slixmpp with STARTTLS + SASL
 - **Offline resilience** — message outbox with retry on transport reconnect
@@ -387,7 +387,7 @@ From `examples/addressbook.p2p-bob.json` — Bob's machine would contain Alice's
 1. **Author** edits `addressbook.json` (or fragments) and distributes the file to trusted peers (USB, encrypted channel, git, etc.).
 2. Each peer places the file in their data directory (or merges fragments into `addressbooks.d/`).
 3. On startup (or `addressbook.reload`), the service recomputes the hash and bumps the version if content changed.
-4. Peers compare **version numbers** and the **visual hash grid** in TUI/Web UI to confirm they share the same contact list.
+4. Peers compare **version numbers** and the **hash fingerprint** (full grid while connecting, compact prefix when online) in TUI/Web UI to confirm they share the same contact list.
 5. For P2P, peers must still exchange **TLS fingerprints** out-of-band and fill in `direct.public_key_fingerprint` before connecting securely.
 
 See [packaging.md](packaging.md) for PyInstaller bundle distribution.

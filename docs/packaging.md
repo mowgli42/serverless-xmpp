@@ -16,7 +16,7 @@ On every service start the Connection Service:
 3. **Computes** a canonical SHA256 content hash and tracks a monotonic **version**
 4. **Persists** metadata to `.addressbook-meta.json` beside the address book
 
-Both UIs display the current **version** and a **visual hash grid** (8×8 color fingerprint) so you can verify you are on the latest address book at a glance.
+Both UIs display the current **version** and your **local identity** (JID matched against the address book). The **visual hash grid** (8×8 color fingerprint) appears in the sidebar **while awaiting connection**; once connected, the sidebar shows a compact hash prefix. The full grid remains in the address book / settings screens for verification.
 
 ### API
 
@@ -81,5 +81,6 @@ Share the **content hash** (`addressbook.status` → `content_hash`) out-of-band
 |-----|--------|
 | `a` | Open address book (status, hash grid, table) |
 | `n` | New contact |
+| `s` | Toggle contact sort (presence ↔ name) |
 | `r` | Reload from disk |
 | `delete` | Remove selected contact |

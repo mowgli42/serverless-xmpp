@@ -22,8 +22,10 @@ python -m xmpp_p2p_chat.text_ui
 |--------|---------|
 | Header | App title + clock |
 | Sidebar header | `Loading…` → `v{N} · {count} contacts · {online} online` |
-| Hash grid | 8×8 colored blocks under contact summary (when address book loaded) |
-| Contact list | One row per contact: presence dot, name, JID, transport |
+| Local identity | `You: {name} ({jid})` from address book match, or JID + not-listed notice |
+| Hash display | **Awaiting connection:** 8×8 grid + verify prompt · **Connected:** short `Book {prefix}…` only |
+| Sort hint | `Sort: status` or `Sort: name` · press **s** to toggle |
+| Contact list | One row per contact: presence dot, name, JID, transport (sorted by presence or name) |
 | Main pane | “Select a contact to chat” placeholder |
 | Status bar | Transport state · contact count · optional outbox count |
 
@@ -35,7 +37,8 @@ python -m xmpp_p2p_chat.text_ui
 
 1. Use **↑/↓** or **j/k** to highlight a contact in the sidebar.
 2. Type in the **Search** box to filter by name or JID (`filter_contacts` in `text_ui/display.py`).
-3. Press **Enter** to open a chat.
+3. Press **s** to toggle sort between **presence status** (online first) and **alphabetical by name**.
+4. Press **Enter** to open a chat.
 
 **Expected:** Chat header shows name, JID, transport, presence. Message history loads from the service.
 
@@ -70,10 +73,13 @@ Reloads contacts and hash from the service without opening the address book moda
 | State | Where shown | Trigger |
 |-------|-------------|---------|
 | `v{N} · contacts · online` | Sidebar summary | `addressbook.list` success |
-| Hash grid | Sidebar + address book | `status.content_hash` present |
+| `You: {name} ({jid})` | Sidebar identity line | `connection.status` → `local_jid` matched in contacts |
+| Full hash grid | Sidebar (awaiting only) + address book settings | No transport `connected` |
+| Compact hash prefix | Sidebar (connected) | At least one transport `connected` |
+| `Sort: status/name` | Below sidebar header | **s** key or default on load |
 | `[red]Error: …` | Status bar | API call failure on load |
 | `Service unavailable — retrying…` | Status bar | Periodic status refresh failed |
-| `Transport: {state}` | Status bar | `connection.changed` push event |
+| Transport line | Status bar | `connection.status` poll / `connection.changed` |
 | `⚠ Issues` + bullet warnings | Address book status | Fragment/health warnings |
 | Pending `…` on message | Chat log | Outbound before ACK |
 | Green `✓` | Chat log | `sent` / `delivered` status |

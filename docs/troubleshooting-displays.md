@@ -9,7 +9,8 @@ Reference for diagnosing UI display issues using **automated failure tests**, **
 | Symptom | Likely cause | Check |
 |---------|--------------|-------|
 | TUI: `Error: …` on startup | Connection service not running or wrong port | `ss -tlnp \| grep 8765`, service logs |
-| TUI: empty hash grid | No address book / empty contacts | `addressbook.status` RPC, data dir |
+| TUI: empty hash grid | No address book / empty contacts, or connected (compact hash only) | `addressbook.status` RPC, `connection.status` transport state |
+| TUI: “not listed in address book” | `local_jid` not in contacts | Add self to address book or set `[p2p] local_jid` |
 | Web: `connecting` forever | WebSocket blocked or service down | Browser devtools → WS to `:8765/rpc` |
 | Web: `disconnected` in header | Status poll failing | `@ebk event=rpc.client.disconnected` |
 | Both: version mismatch | Different address book files | Compare hash grid + `v{N}` |
@@ -40,7 +41,7 @@ cd web_ui && npm test
 
 | Suite | Scenarios |
 |-------|-----------|
-| `test_text_ui_display.py` | Helpers, sidebar version/hash, filter, message formatting, address book panel |
+| `test_text_ui_display.py` | Helpers, sidebar identity/hash modes, sort, filter, message formatting, address book panel |
 | `test_text_ui_failures.py` | API down, send failure, corrupt data warnings, message flood, connection.changed |
 | `test_display_failures.py` | Invalid JSON-RPC, bad JID, malformed fragments, RPC flood, unknown methods |
 | `test_structured_logging.py` | SigNoz JSON shape, EBK formatter, service.start event in log file |

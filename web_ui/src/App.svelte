@@ -42,7 +42,10 @@
   onMount(() => {
     api.onEvent(handleEvent);
     api.connect();
-    waitForService().then(loadContacts);
+    waitForService().then(async () => {
+      await refreshStatus();
+      await loadContacts();
+    });
     const interval = setInterval(() => {
       refreshStatus();
       refreshDiscovery();

@@ -94,12 +94,13 @@ Re-reads the address book from disk (after external edits) and broadcasts `addre
 
 ### `connection.status`
 
-Returns transport states and P2P fingerprint when available.
+Returns transport states, local JID, and P2P fingerprint when available.
 
 ```json
 {
   "result": {
     "transports": [{"transport":"direct-p2p","state":"connected","jid":"..."}],
+    "local_jid": "alice@p2p.local",
     "p2p_fingerprint": "SHA256:...",
     "p2p_listen_port": 5223
   }
