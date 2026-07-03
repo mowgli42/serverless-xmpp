@@ -21,7 +21,10 @@ The user (PretzelerFL) is a pragmatic systems engineer who values:
 ## Mandatory Workflow
 
 ### 1. Before Any Implementation
-- Read the active change folder: `openspec/changes/serverless-xmpp-p2p-chat-client/`
+- Read the relevant OpenSpec change folder:
+  - **MVP / core client**: `openspec/changes/serverless-xmpp-p2p-chat-client/`
+  - **XMPP resilience + address book sync**: `openspec/changes/enhance-xmpp-standards-resilience-addressbook-sync/`
+- Within each folder read:
   - `proposal.md` — Why and scope
   - `design.md` — Architecture, tech choices, data models, API
   - `specs/spec.md` — Detailed behavioral requirements + scenarios (this is the contract)

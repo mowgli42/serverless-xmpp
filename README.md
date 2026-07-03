@@ -49,6 +49,8 @@ The sidebar shows **who you are** (matched from the address book via `local_jid`
 
 ## Quick Start
 
+**Prerequisites:** Python 3.12+, Node.js 18+ (for Web UI build).
+
 ```bash
 git clone https://github.com/mowgli42/serverless-xmpp.git
 cd serverless-xmpp
@@ -56,23 +58,24 @@ cd serverless-xmpp
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-mkdir -p ~/.config/xmpp-p2p-chat ~/.local/share/xmpp-p2p-chat
-cp examples/config.sample.toml ~/.config/xmpp-p2p-chat/config.toml
-cp examples/addressbook.sample.json ~/.local/share/xmpp-p2p-chat/addressbook.json
-# Edit config.toml with your XMPP jid/password/server
+# Generate config (recommended) or copy examples/config.sample.toml
+python -m xmpp_p2p_chat.connection_service --init-config
 
-# Terminal 1: Connection Service
+# Build Web UI once — required on fresh clone (dist/ is not in git)
+cd web_ui && npm install && npm run build && cd ..
+
+# Terminal 1: Connection Service (serves API + http://127.0.0.1:8767/)
 python -m xmpp_p2p_chat.connection_service
 
 # Terminal 2: Text TUI
 python -m xmpp_p2p_chat.text_ui
-
-# Terminal 3: Web UI (built into service at http://127.0.0.1:8767 after npm run build)
-cd web_ui && npm install && npm run build
-# Service auto-serves web_ui/dist when [ui] serve_web = true
 ```
 
-Full details: [docs/quick-start.md](docs/quick-start.md) · **Architecture**: [docs/architecture.md](docs/architecture.md) · **Display walkthroughs**: [TUI](docs/display-walkthrough-tui.md) / [Web](docs/display-walkthrough-web.md) · **Packaging**: [docs/packaging.md](docs/packaging.md) · **Serverless P2P**: [docs/p2p-serverless.md](docs/p2p-serverless.md)
+**Default mode is serverless P2P** (`direct-p2p`). On first run with an empty data directory, a bundled address book is imported automatically. To chat with a peer you must exchange TLS fingerprints — see [docs/p2p-serverless.md](docs/p2p-serverless.md).
+
+For **XMPP server mode** (Prosody/ejabberd), set `[xmpp] jid`, `password`, and `server` in config and use `preferred_transport: "xmpp-server"` on contacts.
+
+Full details: [docs/quick-start.md](docs/quick-start.md) · **P2P setup**: [docs/p2p-serverless.md](docs/p2p-serverless.md) · **Address book sync**: [docs/addressbook-sync.md](docs/addressbook-sync.md) · **Architecture**: [docs/architecture.md](docs/architecture.md)
 
 ## Serverless P2P (No XMPP Server)
 

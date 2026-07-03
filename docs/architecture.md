@@ -38,7 +38,7 @@ Contacts come from a **local address book** (JSON files), not from a server rost
 - **Offline resilience** — message outbox with retry on transport reconnect
 - **Multi-UI sync** — push events over WebSocket (`addressbook.updated`, `message.received`, etc.)
 - **Packaging** — PyInstaller bundle with bundled address book and embedded Web UI (`docs/packaging.md`)
-- **34 automated tests** — unit, transport, API, and integration coverage
+- **89+ automated tests** — unit, transport, API, display, and integration coverage
 
 ---
 
@@ -366,7 +366,7 @@ Global XMPP connection settings (`jid`, `password`, `server`) come from `config.
 
 #### Two-peer P2P setup (Alice's book listing Bob)
 
-From `examples/addressbook.p2p-bob.json` — Bob's machine would contain Alice's entry with Alice's fingerprint:
+From `examples/addressbook.p2p-alice.json` on Alice's machine — Bob's entry needs Bob's fingerprint once exchanged:
 
 ```json
 [

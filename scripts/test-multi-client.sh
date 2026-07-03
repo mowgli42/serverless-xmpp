@@ -3,27 +3,33 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DATA_ROOT="${DATA_ROOT:-$ROOT/.test-data}"
+export DATA_ROOT="${DATA_ROOT:-$ROOT/.test-data}"
 COMPOSE_FILE="$ROOT/docker/docker-compose.yml"
 
 usage() {
   cat <<EOF
 Usage: $0 <command>
 
-Commands:
-  setup       Start Prosody and create alice/bob test accounts
-  teardown    Stop Prosody container
-  init-p2p-alice  Write serverless P2P alice config (port 8765, listen 5223)
-  init-p2p-bob    Write serverless P2P bob config (port 8766, listen 5224)
-  p2p-fingerprints  Print TLS cert fingerprints for alice/bob P2P dirs
-  test-p2p        Run direct P2P pytest + automated two-peer message test
-  service-alice  Run connection service as alice (XMPP mode)
-  service-bob    Run connection service as bob (XMPP mode)
-  test-rpc    Run API integration tests
-  test-chat   Automated two-client message exchange via RPC
+Prosody / XMPP server mode:
+  setup           Start Prosody and create alice/bob test accounts
+  teardown        Stop Prosody container
+  init-alice      Write alice config (API :8765, talks to bob@localhost)
+  init-bob        Write bob config (API :8766, talks to alice@localhost)
+  service-alice   Run connection service as alice
+  service-bob     Run connection service as bob
+  test-chat       Start Prosody + alice service, send test message via RPC
+
+Serverless P2P mode:
+  init-p2p-alice  Write serverless P2P alice config (API :8765, listen :5223)
+  init-p2p-bob    Write serverless P2P bob config (API :8766, listen :5224)
+  p2p-fingerprints  Print TLS cert fingerprints (run after both services started once)
+  test-p2p        Run direct P2P pytest suite
+
+General:
+  test-rpc        Run API integration tests
 
 Environment:
-  DATA_ROOT   Base directory for test data (default: $ROOT/.test-data)
+  DATA_ROOT   Base directory for test data (default: $DATA_ROOT)
 EOF
 }
 
@@ -101,10 +107,10 @@ cmd_init_p2p_bob() {
 
 cmd_p2p_fingerprints() {
   ensure_venv
-  "$ROOT/.venv/bin/python" <<'PY'
+  DATA_ROOT="$DATA_ROOT" "$ROOT/.venv/bin/python" <<PY
 from pathlib import Path
 import os
-root = Path(os.environ.get("DATA_ROOT", "."))
+root = Path(os.environ["DATA_ROOT"])
 for name in ("p2p-alice", "p2p-bob"):
     data = root / name / "data" / "p2p"
     if not data.exists():

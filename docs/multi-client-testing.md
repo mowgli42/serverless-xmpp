@@ -72,8 +72,9 @@ XDG_CONFIG_HOME=.test-data/alice/config .venv/bin/python -m xmpp_p2p_chat.text_u
 
 ```bash
 cd web_ui && npm install && npm run dev
-# Open http://localhost:5173 — connects to ws://127.0.0.1:8765 by default
-# For Bob, set VITE_API_URL or edit api.js to ws://127.0.0.1:8766/rpc
+# Open http://localhost:5173 — default API ws://127.0.0.1:8765/rpc
+# For Bob's service on port 8766:
+VITE_API_URL=ws://127.0.0.1:8766/rpc npm run dev
 ```
 
 ### Verify sync on a single service

@@ -110,6 +110,7 @@ class AddressBookManager:
 
         self._recompute_hash()
         self._load_meta()
+        self._check_p2p_fingerprints()
         logger.info("Loaded %d contacts (%d warnings)", len(self._contacts), len(self.warnings))
 
     def reload(self) -> None:
@@ -165,6 +166,22 @@ class AddressBookManager:
     def _recompute_hash(self) -> None:
         payload = [c.model_dump(mode="json") for c in self.contacts]
         self._content_hash = compute_content_hash(payload)
+
+    def _check_p2p_fingerprints(self) -> None:
+        for contact in self._contacts.values():
+            uses_p2p = contact.preferred_transport == "direct-p2p" or contact.direct is not None
+            if not uses_p2p or not contact.direct:
+                continue
+            fp = (contact.direct.public_key_fingerprint or "").strip()
+            if not fp:
+                self.warnings.append(
+                    f"Contact '{contact.name}' ({contact.id}) is direct-p2p but missing "
+                    "public_key_fingerprint — set it after exchanging certs (see docs/p2p-serverless.md)"
+                )
+            elif fp.upper().startswith("REPLACE"):
+                self.warnings.append(
+                    f"Contact '{contact.name}' ({contact.id}) still has a placeholder fingerprint"
+                )
 
     def _load_file(self, path: Path, source: str) -> None:
         try:

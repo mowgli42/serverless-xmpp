@@ -1,5 +1,10 @@
+# Annotated sample — or generate a fresh file with:
+#   python -m xmpp_p2p_chat.connection_service --init-config
+
 [data]
 directory = "~/.local/share/xmpp-p2p-chat"
+bundled_addressbook = ""
+import_bundled_if_empty = true   # seeds from bundled book when data dir is empty
 
 [connection]
 default_transport = "direct-p2p"
@@ -11,12 +16,14 @@ api_token = ""
 local_jid = "alice@p2p.local"
 listen_host = "0.0.0.0"
 listen_port = 5223
+mdns_enabled = true
+mdns_service_type = "_xmpp-p2p._tcp.local."
 
 [logging]
 level = "INFO"
 file = ""
-json_file = ""       # Structured JSON for SigNoz / OTLP (e.g. ~/.local/share/xmpp-p2p-chat/service.json.log)
-ebk_stderr = true    # @ebk status lines on stderr for AI terminals (Chaterm, OpenClaw)
+json_file = ""       # e.g. ~/.local/share/xmpp-p2p-chat/service.json.log
+ebk_stderr = true
 
 [security]
 enforce_tls = true
@@ -26,10 +33,21 @@ allow_self_signed_direct = true
 serve_web = true
 web_host = "127.0.0.1"
 web_port = 8767
+web_root = ""        # optional override; default finds web_ui/dist
 
 [xmpp]
-# Optional fallback — leave empty for pure serverless P2P mode
+# Optional — leave empty for pure serverless P2P mode
 jid = ""
 password = ""
+password_ref = ""    # keyring reference instead of inline password
 server = ""
 port = 5222
+ping_interval_seconds = 90
+ping_timeout_seconds = 30
+stream_management_enabled = true
+
+[addressbook.sync]
+enabled = false
+secret = ""          # required when enabled; share OOB with trusted group
+auto_apply = false
+max_timestamp_skew_seconds = 300

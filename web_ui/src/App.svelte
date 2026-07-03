@@ -13,7 +13,7 @@
     prepareContactList,
   } from './lib/display.js';
 
-  let api = $state(new ChatAPI());
+  let api = $state(new ChatAPI(import.meta.env.VITE_API_URL || undefined));
   let contacts = $state([]);
   let presence = $state({});
   let addressbookStatus = $state(null);

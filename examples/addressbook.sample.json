@@ -4,7 +4,7 @@
     "jid": "bob@p2p.local",
     "name": "Bob",
     "tags": ["trusted"],
-    "notes": "Direct P2P contact — share your cert fingerprint out-of-band",
+    "notes": "Direct P2P contact — run service once, copy p2p_fingerprint from connection.status into this field",
     "preferred_transport": "direct-p2p",
     "direct": {
       "host": "127.0.0.1",
