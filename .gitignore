@@ -22,4 +22,5 @@ addressbook.json.bak
 addressbook.json.bad
 .test-data/
 .screenshot-data/
+docs/screenshots/*.svg
 .gstack/

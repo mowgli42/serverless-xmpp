@@ -24,7 +24,7 @@ Uses pre-placed local address books to start peer-to-peer style chats (server-me
 |---|---|
 | ![Text TUI](docs/screenshots/text-ui.png) | ![Web UI](docs/screenshots/web-ui.png) |
 
-Regenerate with `./scripts/capture-screenshots.sh` (requires a running Connection Service and `playwright` + `cairosvg`).
+Regenerate with `./scripts/capture-screenshots.sh` (requires a running Connection Service and `playwright` + `cairosvg`). Intermediate `.svg` files are gitignored.
 
 ## Quick Start
 
