@@ -38,9 +38,9 @@ python -m xmpp_p2p_chat.connection_service
 # Terminal 2: Text TUI
 python -m xmpp_p2p_chat.text_ui
 
-# Terminal 3: Web UI
-cd web_ui && npm install && npm run dev
-# Open http://localhost:5173
+# Terminal 3: Web UI (built into service at http://127.0.0.1:8767 after npm run build)
+cd web_ui && npm install && npm run build
+# Service auto-serves web_ui/dist when [ui] serve_web = true
 ```
 
 Full details: [docs/quick-start.md](docs/quick-start.md) · **Serverless P2P**: [docs/p2p-serverless.md](docs/p2p-serverless.md)

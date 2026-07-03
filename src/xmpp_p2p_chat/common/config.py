@@ -48,6 +48,14 @@ class P2PConfig:
 
 
 @dataclass
+class UIConfig:
+    serve_web: bool = True
+    web_host: str = "127.0.0.1"
+    web_port: int = 8767
+    web_root: str = ""
+
+
+@dataclass
 class AppConfig:
     data_directory: Path = field(default_factory=default_data_dir)
     default_transport: str = "direct-p2p"
@@ -60,6 +68,11 @@ class AppConfig:
     allow_self_signed_direct: bool = True
     xmpp: XMPPConfig = field(default_factory=XMPPConfig)
     p2p: P2PConfig = field(default_factory=P2PConfig)
+    ui: UIConfig = field(default_factory=UIConfig)
+
+    @property
+    def web_ui_url(self) -> str:
+        return f"http://{self.ui.web_host}:{self.ui.web_port}/"
 
     @property
     def p2p_cert_dir(self) -> Path:
@@ -128,6 +141,14 @@ def load_config(path: Path | None = None) -> AppConfig:
             listen_port=int(p2p.get("listen_port", cfg.p2p.listen_port)),
         )
 
+        ui = data.get("ui", {})
+        cfg.ui = UIConfig(
+            serve_web=bool(ui.get("serve_web", cfg.ui.serve_web)),
+            web_host=ui.get("web_host", cfg.ui.web_host),
+            web_port=int(ui.get("web_port", cfg.ui.web_port)),
+            web_root=ui.get("web_root", cfg.ui.web_root),
+        )
+
     cfg.data_directory.mkdir(parents=True, exist_ok=True)
     cfg.addressbooks_dir.mkdir(parents=True, exist_ok=True)
     return cfg
@@ -148,6 +169,7 @@ def save_default_config(path: Path | None = None) -> Path:
         "security": {"enforce_tls": True, "allow_self_signed_direct": True},
         "xmpp": {"jid": "", "password": "", "server": "", "port": 5222},
         "p2p": {"local_jid": "", "listen_host": "0.0.0.0", "listen_port": 5223},
+        "ui": {"serve_web": True, "web_host": "127.0.0.1", "web_port": 8767, "web_root": ""},
     }
     with config_path.open("wb") as fh:
         tomli_w.dump(data, fh)

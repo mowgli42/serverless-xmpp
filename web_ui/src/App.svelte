@@ -11,8 +11,18 @@
   let draft = $state('');
   let status = $state('connecting');
   let health = $state(null);
+  let connectionInfo = $state(null);
+  let contactSearch = $state('');
   let showSettings = $state(false);
-  let newContact = $state({ id: '', jid: '', name: '' });
+  let newContact = $state({ id: '', jid: '', name: '', preferred_transport: 'direct-p2p', direct: { host: '127.0.0.1', port: 5224, public_key_fingerprint: '' } });
+
+  let filteredContacts = $derived(
+    contacts.filter((c) => {
+      const q = contactSearch.trim().toLowerCase();
+      if (!q) return true;
+      return c.name?.toLowerCase().includes(q) || c.jid?.toLowerCase().includes(q) || c.id?.toLowerCase().includes(q);
+    })
+  );
 
   onMount(() => {
     api.onEvent(handleEvent);
@@ -38,9 +48,9 @@
 
   async function refreshStatus() {
     try {
-      const conn = await api.call('connection.status');
-      const transports = conn.transports || [];
-      status = transports[0]?.state || 'unknown';
+      connectionInfo = await api.call('connection.status');
+      const transports = connectionInfo.transports || [];
+      status = transports.map((t) => `${t.transport}:${t.state}`).join(' · ') || 'unknown';
       health = await api.call('system.health');
     } catch {
       status = 'disconnected';
@@ -113,13 +123,14 @@
   <aside class="w-72 border-r border-slate-800 flex flex-col bg-slate-900">
     <header class="p-4 border-b border-slate-800">
       <h1 class="text-lg font-semibold">Serverless XMPP</h1>
-      <p class="text-xs text-slate-400">Local service · {status}</p>
+      <p class="text-xs text-emerald-500/80">Local service mode</p>
+      <p class="text-xs text-slate-400 truncate" title={status}>{status}</p>
     </header>
     <div class="p-3">
-      <input class="w-full rounded bg-slate-800 px-3 py-2 text-sm" placeholder="Search contacts..." />
+      <input class="w-full rounded bg-slate-800 px-3 py-2 text-sm" placeholder="Search contacts..." bind:value={contactSearch} aria-label="Search contacts" />
     </div>
     <ul class="flex-1 overflow-y-auto">
-      {#each contacts as contact (contact.id)}
+      {#each filteredContacts as contact (contact.id)}
         <li>
           <button
             class="w-full text-left px-4 py-3 hover:bg-slate-800 flex items-center gap-3 {selectedId === contact.id ? 'bg-slate-800' : ''}"
@@ -178,14 +189,25 @@
   {#if showSettings}
     <aside class="w-80 border-l border-slate-800 bg-slate-900 p-4 space-y-4 overflow-y-auto">
       <h3 class="font-semibold">Service</h3>
+      {#if connectionInfo?.transports?.length}
+        <ul class="text-sm text-slate-400 space-y-1">
+          {#each connectionInfo.transports as t}
+            <li>{t.transport}: {t.state}</li>
+          {/each}
+        </ul>
+      {/if}
+      {#if connectionInfo?.p2p_fingerprint}
+        <p class="text-xs text-slate-500 break-all">P2P fingerprint: {connectionInfo.p2p_fingerprint}</p>
+        <p class="text-xs text-slate-500">Listen port: {connectionInfo.p2p_listen_port}</p>
+      {/if}
       {#if health}
-        <div class="text-sm text-slate-400 space-y-1">
+        <div class="text-sm text-slate-400 space-y-1 pt-2">
           <p>Uptime: {Math.round(health.uptime_seconds)}s</p>
           <p>Contacts: {health.contact_count}</p>
           <p>Outbox: {health.pending_outbox}</p>
         </div>
       {/if}
-      <button class="rounded bg-slate-800 px-3 py-2 text-sm" onclick={reconnect}>Reconnect XMPP</button>
+      <button class="rounded bg-slate-800 px-3 py-2 text-sm" onclick={reconnect}>Reconnect transports</button>
 
       <h3 class="font-semibold pt-4">Add contact</h3>
       <input class="w-full rounded bg-slate-800 px-3 py-2 text-sm mb-2" placeholder="id" bind:value={newContact.id} />

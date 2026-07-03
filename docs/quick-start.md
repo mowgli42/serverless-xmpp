@@ -25,25 +25,18 @@ cp examples/config.sample.toml ~/.config/xmpp-p2p-chat/config.toml
 cp examples/addressbook.sample.json ~/.local/share/xmpp-p2p-chat/addressbook.json
 ```
 
-Edit `config.toml` and set your XMPP credentials:
-
-```toml
-[xmpp]
-jid = "you@your-server.example"
-password = "your-password"
-server = "your-server.example"
-port = 5222
-```
+Edit `config.toml` for **serverless P2P** (default) or XMPP server fallback — see [p2p-serverless.md](./p2p-serverless.md).
 
 ## Run
 
 **Terminal 1 — Connection Service**
 
 ```bash
+cd web_ui && npm install && npm run build   # once, enables embedded UI
 python -m xmpp_p2p_chat.connection_service
 ```
 
-The API listens on `ws://127.0.0.1:8765/rpc` (localhost only).
+The API listens on `ws://127.0.0.1:8765/rpc`. If `web_ui/dist` exists, the SPA is also served at `http://127.0.0.1:8767/`.
 
 **Terminal 2 — Text TUI**
 
@@ -51,15 +44,13 @@ The API listens on `ws://127.0.0.1:8765/rpc` (localhost only).
 python -m xmpp_p2p_chat.text_ui
 ```
 
-**Terminal 3 — Web UI**
+**Terminal 3 — Web UI (dev mode alternative)**
 
 ```bash
-cd web_ui
-npm install
-npm run dev
+cd web_ui && npm run dev
 ```
 
-Open http://localhost:5173 in your browser.
+Open http://localhost:5173 for hot reload, or http://127.0.0.1:8767/ when using the embedded server.
 
 ## Multi-Client Testing
 

@@ -20,6 +20,11 @@ file = ""
 enforce_tls = true
 allow_self_signed_direct = true
 
+[ui]
+serve_web = true
+web_host = "127.0.0.1"
+web_port = 8767
+
 [xmpp]
 # Optional fallback — leave empty for pure serverless P2P mode
 jid = ""

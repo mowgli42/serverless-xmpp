@@ -57,6 +57,7 @@ class ChatApp(App):
         Binding("c", "focus_contacts", "Contacts"),
         Binding("slash", "focus_input", "Message"),
         Binding("r", "refresh_contacts", "Refresh"),
+        Binding("question_mark", "show_help", "Help"),
     ]
 
     def __init__(self, api_url: str | None = None, token: str = "") -> None:
@@ -70,12 +71,14 @@ class ChatApp(App):
         self.current_chat_id: str | None = None
         self.current_contact_name: str = ""
         self.messages: list[dict] = []
+        self.contact_filter: str = ""
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with Horizontal():
             with Vertical(id="sidebar"):
                 yield Label("Contacts", id="contacts-title")
+                yield Input(placeholder="Filter contacts...", id="contact-filter")
                 yield ListView(id="contact-list")
             with Vertical():
                 yield Label("Select a contact", id="chat-title")
@@ -103,11 +106,19 @@ class ChatApp(App):
     async def _render_contacts(self) -> None:
         list_view = self.query_one("#contact-list", ListView)
         await list_view.clear()
+        needle = self.contact_filter.lower()
         for contact in self.contacts:
+            if needle and needle not in contact["name"].lower() and needle not in contact["jid"].lower():
+                continue
             pres = self.presence.get(contact["id"], {})
             show = pres.get("show", "offline")
             label = f"[{'green' if show == 'available' else 'dim'}]●[/] {contact['name']}"
             await list_view.append(ListItem(Label(label), id=f"contact-{contact['id']}"))
+
+    @on(Input.Changed, "#contact-filter")
+    async def on_contact_filter_changed(self, event: Input.Changed) -> None:
+        self.contact_filter = event.value
+        await self._render_contacts()
 
     @on(ListView.Selected)
     async def on_contact_selected(self, event: ListView.Selected) -> None:
@@ -198,12 +209,19 @@ class ChatApp(App):
             result = await self.client.call("connection.status")
             transports = result.get("transports", [])
             if transports:
-                state = transports[0].get("state", "unknown")
+                parts = [f"{t.get('transport', '?')}:{t.get('state', '?')}" for t in transports]
                 self.query_one("#status-bar", Static).update(
-                    f"XMPP: {state} · {len(self.contacts)} contacts"
+                    f"{' · '.join(parts)} · {len(self.contacts)} contacts"
                 )
         except Exception:
             self.query_one("#status-bar", Static).update("Service unavailable — retrying...")
+
+    def action_show_help(self) -> None:
+        self.notify(
+            "q=quit · c=contacts · /=message · r=refresh · ?=help · Enter=send",
+            title="Keyboard shortcuts",
+            timeout=8,
+        )
 
     def action_focus_contacts(self) -> None:
         self.query_one("#contact-list", ListView).focus()

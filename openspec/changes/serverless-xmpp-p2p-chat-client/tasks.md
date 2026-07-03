@@ -9,102 +9,102 @@
 
 ## Phase 0: Project Setup & Tooling (Do First)
 
-- [ ] Create project root with `pyproject.toml` (Python 3.12+, hatchling or setuptools, dependencies for slixmpp, textual, websockets, aiosqlite, tomli, keyring, pydantic for models optional but recommended).
-- [ ] Set up standard src layout: `src/xmpp_p2p_chat/`, `tests/`, `README.md`, `LICENSE` (MIT recommended).
-- [ ] Configure `ruff` (lint + format), `pyright` or `mypy`, and a basic `pytest` setup with asyncio support.
-- [ ] Create `.gitignore` (ignore venv, __pycache__, .env, logs/, data/ for user data, node_modules for web_ui).
-- [ ] Initialize git repo and make initial commit with this OpenSpec change folder copied in (or reference it).
-- [ ] Create `src/xmpp_p2p_chat/common/config.py` that loads TOML from XDG-compliant paths or `~/.config/xmpp-p2p-chat/config.toml` (or data dir) with sensible defaults matching design.md.
-- [ ] Create `src/xmpp_p2p_chat/common/models.py` with Pydantic (or dataclass + validation) models for `Contact`, `Message`, `ChatSession`, `AddressBook`.
-- [ ] Write a small smoke test that loads config and validates a sample Contact.
+- [x] Create project root with `pyproject.toml` (Python 3.12+, hatchling or setuptools, dependencies for slixmpp, textual, websockets, aiosqlite, tomli, keyring, pydantic for models optional but recommended).
+- [x] Set up standard src layout: `src/xmpp_p2p_chat/`, `tests/`, `README.md`, `LICENSE` (MIT recommended).
+- [x] Configure `ruff` (lint + format), `pyright` or `mypy`, and a basic `pytest` setup with asyncio support.
+- [x] Create `.gitignore` (ignore venv, __pycache__, .env, logs/, data/ for user data, node_modules for web_ui).
+- [x] Initialize git repo and make initial commit with this OpenSpec change folder copied in (or reference it).
+- [x] Create `src/xmpp_p2p_chat/common/config.py` that loads TOML from XDG-compliant paths or `~/.config/xmpp-p2p-chat/config.toml` (or data dir) with sensible defaults matching design.md.
+- [x] Create `src/xmpp_p2p_chat/common/models.py` with Pydantic (or dataclass + validation) models for `Contact`, `Message`, `ChatSession`, `AddressBook`.
+- [x] Write a small smoke test that loads config and validates a sample Contact.
 
 ## Phase 1: Connection Service Core – Address Book & Persistence
 
-- [ ] Implement `AddressBookManager` in `connection_service/addressbook.py`:
+- [x] Implement `AddressBookManager` in `connection_service/addressbook.py`:
   - Load from `addressbook.json` + `addressbooks.d/*.json`.
   - Merge logic with clear conflict handling.
   - `list()`, `get(id)`, `add(contact)`, `update(id, partial)`, `remove(id)` methods.
   - Atomic write (temp file + rename) on any mutation.
   - Validation of JID format (use `xmpp` or simple regex + domain validation).
-- [ ] Implement `PersistenceManager` (or module) using `aiosqlite`:
+- [x] Implement `PersistenceManager` (or module) using `aiosqlite`:
   - Initialize DB schema on first run (messages, chats, outbox, presence tables).
   - Methods: `save_message()`, `get_history(chat_id, limit, before)`, `queue_outbound()`, `mark_delivered(message_id)`, `get_pending_outbox(contact_id)`.
   - Migration support or simple "if table missing create".
-- [ ] Add unit tests for AddressBookManager (load, add, update, malformed handling) and basic Persistence (CRUD messages).
-- [ ] Wire both managers into a central `Service` class that owns the asyncio event loop.
+- [x] Add unit tests for AddressBookManager (load, add, update, malformed handling) and basic Persistence (CRUD messages).
+- [x] Wire both managers into a central `Service` class that owns the asyncio event loop.
 
 ## Phase 2: Connection Service – XMPP Server Transport (MVP)
 
-- [ ] Create `transports/base.py` defining abstract `BaseTransport` protocol/interface with methods: `connect(jid, credentials)`, `disconnect()`, `send_message(to_jid, body, message_id?)`, `set_presence(show, status)`, and event callback registration (`on_message`, `on_presence`, `on_disconnect`).
-- [ ] Implement `XMPPServerTransport` in `transports/xmpp_server.py`:
+- [x] Create `transports/base.py` defining abstract `BaseTransport` protocol/interface with methods: `connect(jid, credentials)`, `disconnect()`, `send_message(to_jid, body, message_id?)`, `set_presence(show, status)`, and event callback registration (`on_message`, `on_presence`, `on_disconnect`).
+- [x] Implement `XMPPServerTransport` in `transports/xmpp_server.py`:
   - Wrap `slixmpp.ClientXMPP`.
   - Handle connection, authentication, resource binding, initial presence.
   - Register handlers for `<message type="chat">` and presence stanzas.
   - Normalize incoming stanzas to internal `Message` / presence models.
   - Implement auto-reconnect with backoff inside the transport or in SessionManager.
   - Enforce TLS and surface certificate validation results.
-- [ ] Create `SessionManager` that:
+- [x] Create `SessionManager` that:
   - Maps `chat_id` ↔ active transport + remote JID.
   - On `start_chat(contact)` selects appropriate transport (server for MVP), calls connect if needed, returns chat metadata.
   - Routes `send_message` to the correct transport.
   - Listens to transport events, persists messages, pushes notifications via API layer, manages outbox drain.
-- [ ] Test the transport in isolation (mock slixmpp or use a local test XMPP server like Prosody in Docker for integration tests – document how).
-- [ ] Ensure all external I/O (XMPP) happens only through this transport layer.
+- [x] Test the transport in isolation (mock slixmpp or use a local test XMPP server like Prosody in Docker for integration tests – document how).
+- [x] Ensure all external I/O (XMPP) happens only through this transport layer.
 
 ## Phase 3: Connection Service – API Layer (WebSocket + JSON-RPC)
 
-- [ ] Implement WebSocket server using `websockets` library (or `aiohttp` if preferred) in `api.py` or `service.py`.
+- [x] Implement WebSocket server using `websockets` library (or `aiohttp` if preferred) in `api.py` or `service.py`.
   - Bind to `config.api_host:api_port` (default 127.0.0.1:8765).
   - Simple JSON-RPC 2.0 dispatcher: parse incoming messages, route to handler methods, return responses or errors.
   - Support server-initiated push (notifications) to all connected clients or per-subscription.
-- [ ] Define and implement core RPC methods matching spec scenarios:
+- [x] Define and implement core RPC methods matching spec scenarios:
   - `addressbook.*` (list, add, update, remove)
   - `chat.start`, `chat.send_message`, `chat.get_history`
   - `presence.set`, `connection.status`, `system.health`, `system.shutdown`
   - Auth handshake if `api_token` configured.
-- [ ] Implement push events: `message.received`, `message.updated`, `presence.updated`, `addressbook.updated`, `connection.changed`.
-- [ ] Add connection lifecycle management (on client connect/disconnect, track active clients, clean up on close).
-- [ ] Write a simple Python test client (or use `wscat` / browser console) that exercises the full RPC surface and verifies push notifications.
-- [ ] Document the API (even if just in a `docs/api.md` or docstring) with example request/response JSON.
+- [x] Implement push events: `message.received`, `message.updated`, `presence.updated`, `addressbook.updated`, `connection.changed`.
+- [x] Add connection lifecycle management (on client connect/disconnect, track active clients, clean up on close).
+- [x] Write a simple Python test client (or use `wscat` / browser console) that exercises the full RPC surface and verifies push notifications.
+- [x] Document the API (even if just in a `docs/api.md` or docstring) with example request/response JSON.
 
 ## Phase 4: Text-Based UI (TUI) with Textual
 
-- [ ] Create `text_ui/app.py` as the main `App` subclass from `textual.app`.
+- [x] Create `text_ui/app.py` as the main `App` subclass from `textual.app`.
   - Compose main layout: header (service status, presence), sidebar or tab for contacts, main chat area (or multiple docked panes), footer (input or commands).
   - Use `textual.widgets`, `Header`, `Footer`, `DataTable` or custom `ContactList`, `ChatLog` (virtualized list or Rich renderables), `Input`.
-- [ ] Implement `APIClient` helper in TUI (or shared `common/`) that wraps WebSocket + JSON-RPC calls with async/await, auto-reconnect, and event subscription (simple pubsub or callback registry).
-- [ ] Build Contacts screen/widget:
+- [x] Implement `APIClient` helper in TUI (or shared `common/`) that wraps WebSocket + JSON-RPC calls with async/await, auto-reconnect, and event subscription (simple pubsub or callback registry).
+- [x] Build Contacts screen/widget:
   - Reactive list populated from `addressbook.list`.
   - Search/filter input.
   - Display name, JID, tags, presence dot, unread count.
   - Keyboard navigation and "open chat" action.
-- [ ] Build Chat screen/pane:
+- [x] Build Chat screen/pane:
   - Load history on open via `chat.get_history`.
   - Render messages with direction styling, timestamps, status.
   - Composer `Input` that calls `chat.send_message` on submit (optimistic update + server confirmation).
   - Live append of pushed `message.received` events.
   - Auto-scroll logic (only if user is at bottom).
-- [ ] Add global keybindings (quit, help `?`, switch chats, toggle sidebar).
-- [ ] Theming: support Textual CSS or built-in themes; make it pleasant in light/dark terminal.
-- [ ] Handle service disconnect gracefully (banner + retry button or auto).
+- [x] Add global keybindings (quit, help `?`, switch chats, toggle sidebar).
+- [x] Theming: support Textual CSS or built-in themes; make it pleasant in light/dark terminal.
+- [x] Handle service disconnect gracefully (banner + retry button or auto).
 - [ ] Smoke test: run service in one terminal, TUI in another, add contact, start chat, exchange messages (use a real or test XMPP account).
 
 ## Phase 5: Web UI (Svelte SPA)
 
-- [ ] Create `web_ui/` as a Vite + Svelte 5 project (`npm create vite@latest web_ui -- --template svelte` or SvelteKit if preferred for future SSR but static is fine).
+- [x] Create `web_ui/` as a Vite + Svelte 5 project (`npm create vite@latest web_ui -- --template svelte` or SvelteKit if preferred for future SSR but static is fine).
   - Install `tailwindcss`, `daisyui` (or shadcn-svelte), `svelte-preprocess`.
   - Set up `src/lib/api.ts`: WebSocket client class that handles JSON-RPC requests, responses, and subscriptions (EventTarget or Svelte stores for reactive state).
-- [ ] Main layout (`App.svelte` or `+layout`): sidebar (contacts), main chat pane, top nav (status, settings button).
-- [ ] `ContactList.svelte`: searchable list, presence indicators (colored dot + status text), unread badges, click to open chat. Use Svelte 5 runes or stores fed by API pushes.
-- [ ] `ChatPane.svelte`:
+- [x] Main layout (`App.svelte` or `+layout`): sidebar (contacts), main chat pane, top nav (status, settings button).
+- [x] `ContactList.svelte`: searchable list, presence indicators (colored dot + status text), unread badges, click to open chat. Use Svelte 5 runes or stores fed by API pushes.
+- [x] `ChatPane.svelte`:
   - Virtual or simple message list (for MVP 50–100 messages is fine; use `{#each}` + auto-scroll div).
   - Different styling for in/out messages (bubbles).
   - Composer with send button + keyboard support.
   - Optimistic messages + live updates from push events.
   - Show connection status and transport info.
-- [ ] Settings / Service modal or page: form to add/edit contact, manual reconnect buttons, basic health display, presence setter.
+- [x] Settings / Service modal or page: form to add/edit contact, manual reconnect buttons, basic health display, presence setter.
 - [ ] Make it responsive (mobile-friendly sidebar collapse) and accessible (ARIA, keyboard nav, high contrast).
-- [ ] Build step: `npm run build` produces static assets that can be served by any HTTP server or (future) embedded in the Python service.
+- [x] Build step: `npm run build` produces static assets that can be served by any HTTP server or (future) embedded in the Python service.
 - [ ] Test in browser: connect to running service, full happy-path chat flow, multiple tabs/windows staying in sync via pushes.
 
 ## Phase 6: Integration, Polish, Security & Documentation
@@ -116,23 +116,23 @@
   4. Receive in Web UI (and vice versa).
   5. Disconnect network or stop XMPP server → verify queuing.
   6. Reconnect → verify delivery and history.
-- [ ] Implement basic error handling and user-facing messages for common failures (auth fail, network error, invalid JID, service unreachable).
-- [ ] Security pass:
+- [x] Implement basic error handling and user-facing messages for common failures (auth fail, network error, invalid JID, service unreachable).
+- [x] Security pass:
   - Verify localhost-only binding.
   - Add TODO comments or config for keyring integration (implement simple version if time).
   - Ensure no plaintext passwords in logs or address book JSON.
   - Add input sanitization notes or helpers for message bodies (though XMPP libs handle most).
-- [ ] Logging: structured or simple with levels; redact sensitive fields in production mode.
-- [ ] Update `README.md` with:
+- [x] Logging: structured or simple with levels; redact sensitive fields in production mode.
+- [x] Update `README.md` with:
   - Quick start (install deps, run service, run TUI, open web UI).
   - Example minimal `addressbook.json` and `config.toml`.
   - How to point at a local Prosody or public XMPP server for testing.
   - Architecture diagram (ASCII or link to design.md).
   - Contribution / spec update process (OpenSpec reminder).
-- [ ] Add `docs/` or inline docs for API, data directory layout, and future direct P2P extension points.
-- [ ] Create a sample `examples/addressbook.sample.json` and `examples/config.sample.toml`.
-- [ ] Final lint/format pass across all Python and frontend code.
-- [ ] Optional but recommended: simple `pytest` integration test that spins up service in background thread/process and exercises API with a mock or real XMPP connection (mark as slow/integration).
+- [x] Add `docs/` or inline docs for API, data directory layout, and future direct P2P extension points.
+- [x] Create a sample `examples/addressbook.sample.json` and `examples/config.sample.toml`.
+- [x] Final lint/format pass across all Python and frontend code.
+- [x] Optional but recommended: simple `pytest` integration test that spins up service in background thread/process and exercises API with a mock or real XMPP connection (mark as slow/integration).
 
 ## Phase 7: Validation Against Specification & Closeout
 
@@ -145,12 +145,12 @@
 
 ## Stretch Goals / Post-MVP (Only After All Above Are Complete and Validated)
 
-- [ ] Implement `DirectP2PTransport` skeleton (socket + TLS + basic XML stream open/close, stanza send/receive). Do not wire into SessionManager until MVP is solid.
+- [x] Implement `DirectP2PTransport` skeleton (socket + TLS + basic XML stream open/close, stanza send/receive). Do not wire into SessionManager until MVP is solid.
 - [ ] Add optional mDNS discovery using `zeroconf` for local peers (XEP-0174 inspiration).
 - [ ] Simple per-chat message encryption helper (AES-GCM with key from address book entry) – behind a feature flag.
 - [ ] File attachment support (base64 or HTTP upload + direct).
 - [ ] Packaging script / PyInstaller spec for a single executable containing service + TUI.
-- [ ] Embed a tiny HTTP server in the Python service to serve the built `web_ui/dist/` assets on the same port or `/ui` path for one-command launch experience.
+- [x] Embed a tiny HTTP server in the Python service to serve the built `web_ui/dist/` assets on the same port or `/ui` path for one-command launch experience.
 
 **Completion Criteria**: When every checkbox in Phases 0–6 is marked and the end-to-end flow works reliably for server-mediated XMPP chats using pre-placed address book entries from both UIs, with clean separation of concerns, this change is ready to be archived. The resulting codebase will be a solid foundation for privacy-respecting, local-first, multi-UI XMPP chat tooling.
 

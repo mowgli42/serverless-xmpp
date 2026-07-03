@@ -17,6 +17,7 @@ from xmpp_p2p_chat.common.models import (
     MessageDirection,
     TransportStatus,
 )
+from xmpp_p2p_chat.common.sanitize import sanitize_message_body
 from xmpp_p2p_chat.connection_service.addressbook import AddressBookManager
 from xmpp_p2p_chat.connection_service.persistence import PersistenceManager
 from xmpp_p2p_chat.connection_service.transports.base import BaseTransport
@@ -182,6 +183,10 @@ class SessionManager:
         if not session:
             raise ValueError(f"Chat not found: {chat_id}")
 
+        body = sanitize_message_body(body)
+        if not body.strip():
+            raise ValueError("Message body is empty after sanitization")
+
         contact = self.addressbook.get(session.contact_id)
         if not contact:
             raise ValueError(f"Contact not found for chat: {chat_id}")
@@ -305,7 +310,7 @@ class SessionManager:
         message = Message(
             chat_id=chat_id,
             direction=MessageDirection.IN,
-            body=body,
+            body=sanitize_message_body(body),
             stanza_id=stanza_id,
             delivered=True,
             status=DeliveryStatus.DELIVERED,
