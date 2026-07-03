@@ -41,17 +41,33 @@ class XMPPConfig:
 
 
 @dataclass
+class P2PConfig:
+    local_jid: str = ""
+    listen_host: str = "0.0.0.0"
+    listen_port: int = 5223
+
+
+@dataclass
 class AppConfig:
     data_directory: Path = field(default_factory=default_data_dir)
-    default_transport: str = "xmpp-server"
+    default_transport: str = "direct-p2p"
     api_host: str = "127.0.0.1"
     api_port: int = 8765
     api_token: str = ""
     log_level: str = "INFO"
     log_file: str = ""
     enforce_tls: bool = True
-    allow_self_signed_direct: bool = False
+    allow_self_signed_direct: bool = True
     xmpp: XMPPConfig = field(default_factory=XMPPConfig)
+    p2p: P2PConfig = field(default_factory=P2PConfig)
+
+    @property
+    def p2p_cert_dir(self) -> Path:
+        return self.data_directory / "p2p"
+
+    @property
+    def effective_local_jid(self) -> str:
+        return self.p2p.local_jid or self.xmpp.jid or "user@p2p.local"
 
     @property
     def addressbook_path(self) -> Path:
@@ -105,6 +121,13 @@ def load_config(path: Path | None = None) -> AppConfig:
             port=int(xmpp.get("port", cfg.xmpp.port)),
         )
 
+        p2p = data.get("p2p", {})
+        cfg.p2p = P2PConfig(
+            local_jid=p2p.get("local_jid", cfg.p2p.local_jid),
+            listen_host=p2p.get("listen_host", cfg.p2p.listen_host),
+            listen_port=int(p2p.get("listen_port", cfg.p2p.listen_port)),
+        )
+
     cfg.data_directory.mkdir(parents=True, exist_ok=True)
     cfg.addressbooks_dir.mkdir(parents=True, exist_ok=True)
     return cfg
@@ -116,14 +139,15 @@ def save_default_config(path: Path | None = None) -> Path:
     data = {
         "data": {"directory": str(default_data_dir())},
         "connection": {
-            "default_transport": "xmpp-server",
+            "default_transport": "direct-p2p",
             "api_host": "127.0.0.1",
             "api_port": 8765,
             "api_token": "",
         },
         "logging": {"level": "INFO", "file": ""},
-        "security": {"enforce_tls": True, "allow_self_signed_direct": False},
+        "security": {"enforce_tls": True, "allow_self_signed_direct": True},
         "xmpp": {"jid": "", "password": "", "server": "", "port": 5222},
+        "p2p": {"local_jid": "", "listen_host": "0.0.0.0", "listen_port": 5223},
     }
     with config_path.open("wb") as fh:
         tomli_w.dump(data, fh)

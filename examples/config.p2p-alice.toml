@@ -1,0 +1,15 @@
+[data]
+directory = "~/.local/share/xmpp-p2p-alice"
+
+[connection]
+default_transport = "direct-p2p"
+api_host = "127.0.0.1"
+api_port = 8765
+
+[p2p]
+local_jid = "alice@p2p.local"
+listen_host = "127.0.0.1"
+listen_port = 5223
+
+[security]
+allow_self_signed_direct = true

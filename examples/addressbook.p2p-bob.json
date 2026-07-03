@@ -1,0 +1,13 @@
+[
+  {
+    "id": "alice",
+    "jid": "alice@p2p.local",
+    "name": "Alice",
+    "preferred_transport": "direct-p2p",
+    "direct": {
+      "host": "127.0.0.1",
+      "port": 5223,
+      "public_key_fingerprint": "REPLACE_WITH_ALICE_FINGERPRINT"
+    }
+  }
+]

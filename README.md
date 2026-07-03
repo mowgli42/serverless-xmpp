@@ -4,7 +4,7 @@
 
 Uses pre-placed local address books to start peer-to-peer style chats (server-mediated XMPP for MVP, with architecture ready for direct P2P streams). Built for trusted circles who want control over their data and infrastructure.
 
-> **Status**: MVP implementation in progress — Connection Service, Text TUI, and Web SPA are functional. See [docs/quick-start.md](docs/quick-start.md).
+> **Status**: MVP with **direct P2P (serverless) transport** — peers connect over TLS without a central XMPP server. XMPP server mode remains available as fallback.
 
 ## Key Features
 
@@ -43,7 +43,21 @@ cd web_ui && npm install && npm run dev
 # Open http://localhost:5173
 ```
 
-Full details: [docs/quick-start.md](docs/quick-start.md)
+Full details: [docs/quick-start.md](docs/quick-start.md) · **Serverless P2P**: [docs/p2p-serverless.md](docs/p2p-serverless.md)
+
+## Serverless P2P (No XMPP Server)
+
+The default transport is **direct peer-to-peer** — each client listens for inbound TLS connections and connects outbound to contacts listed in the address book:
+
+```bash
+cp examples/config.p2p-alice.toml ~/.config/xmpp-p2p-chat/config.toml
+cp examples/addressbook.p2p-alice.json ~/.local/share/xmpp-p2p-chat/addressbook.json
+# Share TLS fingerprints out-of-band, update addressbook direct.public_key_fingerprint
+
+python -m xmpp_p2p_chat.connection_service
+```
+
+See [docs/p2p-serverless.md](docs/p2p-serverless.md) for the full two-peer setup.
 
 ## Multi-Client Testing
 
@@ -110,7 +124,8 @@ This project follows the [OpenSpec](https://github.com/Fission-AI/OpenSpec) work
 - [x] MVP: WebSocket JSON-RPC API
 - [x] MVP: Text TUI + Web SPA
 - [x] Multi-client test harness (Docker Prosody + scripts)
-- [ ] Direct P2P transport
+- [x] MVP: Direct P2P transport (TLS + XMPP streams, mutual peer connections)
+- [ ] mDNS LAN discovery (zeroconf)
 - [ ] Packaging & distribution
 - [ ] Polish, E2EE, embedded web UI server
 

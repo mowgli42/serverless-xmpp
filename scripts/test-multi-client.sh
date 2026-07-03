@@ -13,10 +13,12 @@ Usage: $0 <command>
 Commands:
   setup       Start Prosody and create alice/bob test accounts
   teardown    Stop Prosody container
-  init-alice  Write alice config + addressbook to \$DATA_ROOT/alice
-  init-bob    Write bob config + addressbook to \$DATA_ROOT/bob
-  service-alice  Run connection service as alice
-  service-bob    Run connection service as bob
+  init-p2p-alice  Write serverless P2P alice config (port 8765, listen 5223)
+  init-p2p-bob    Write serverless P2P bob config (port 8766, listen 5224)
+  p2p-fingerprints  Print TLS cert fingerprints for alice/bob P2P dirs
+  test-p2p        Run direct P2P pytest + automated two-peer message test
+  service-alice  Run connection service as alice (XMPP mode)
+  service-bob    Run connection service as bob (XMPP mode)
   test-rpc    Run API integration tests
   test-chat   Automated two-client message exchange via RPC
 
@@ -79,6 +81,47 @@ cmd_teardown() {
   docker compose -f "$COMPOSE_FILE" down
 }
 
+cmd_init_p2p_alice() {
+  local dir="$DATA_ROOT/p2p-alice"
+  mkdir -p "$dir/config" "$dir/data"
+  cp "$ROOT/examples/config.p2p-alice.toml" "$dir/config/config.toml"
+  sed -i "s|~/.local/share/xmpp-p2p-alice|$dir/data|g" "$dir/config/config.toml"
+  cp "$ROOT/examples/addressbook.p2p-alice.json" "$dir/data/addressbook.json"
+  echo "P2P alice config: $dir"
+}
+
+cmd_init_p2p_bob() {
+  local dir="$DATA_ROOT/p2p-bob"
+  mkdir -p "$dir/config" "$dir/data"
+  cp "$ROOT/examples/config.p2p-bob.toml" "$dir/config/config.toml"
+  sed -i "s|~/.local/share/xmpp-p2p-bob|$dir/data|g" "$dir/config/config.toml"
+  cp "$ROOT/examples/addressbook.p2p-bob.json" "$dir/data/addressbook.json"
+  echo "P2P bob config: $dir"
+}
+
+cmd_p2p_fingerprints() {
+  ensure_venv
+  "$ROOT/.venv/bin/python" <<'PY'
+from pathlib import Path
+import os
+root = Path(os.environ.get("DATA_ROOT", "."))
+for name in ("p2p-alice", "p2p-bob"):
+    data = root / name / "data" / "p2p"
+    if not data.exists():
+        print(f"{name}: not initialized (run init-p2p-{name.split('-')[1]})")
+        continue
+    from xmpp_p2p_chat.common.certs import ensure_p2p_certificates
+    _, _, fp = ensure_p2p_certificates(data, name.split("-")[1])
+    print(f"{name}: {fp}")
+PY
+}
+
+cmd_test_p2p() {
+  ensure_venv
+  cd "$ROOT"
+  "$ROOT/.venv/bin/pytest" tests/test_direct_p2p.py -v
+}
+
 cmd_init_alice() { write_config alice 8765 bob; }
 cmd_init_bob() { write_config bob 8766 alice; }
 
@@ -138,6 +181,10 @@ case "${1:-}" in
   teardown) cmd_teardown ;;
   init-alice) cmd_init_alice ;;
   init-bob) cmd_init_bob ;;
+  init-p2p-alice) cmd_init_p2p_alice ;;
+  init-p2p-bob) cmd_init_p2p_bob ;;
+  p2p-fingerprints) cmd_p2p_fingerprints ;;
+  test-p2p) cmd_test_p2p ;;
   service-alice) cmd_service_alice ;;
   service-bob) cmd_service_bob ;;
   test-rpc) cmd_test_rpc ;;

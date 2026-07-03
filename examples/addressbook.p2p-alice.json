@@ -1,0 +1,13 @@
+[
+  {
+    "id": "bob",
+    "jid": "bob@p2p.local",
+    "name": "Bob",
+    "preferred_transport": "direct-p2p",
+    "direct": {
+      "host": "127.0.0.1",
+      "port": 5224,
+      "public_key_fingerprint": "REPLACE_WITH_BOB_FINGERPRINT"
+    }
+  }
+]

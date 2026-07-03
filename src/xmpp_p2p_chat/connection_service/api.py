@@ -141,7 +141,12 @@ class RpcServer:
 
         if method == "connection.status":
             statuses = svc.sessions.connection_status()
-            return {"transports": [s.model_dump(mode="json") for s in statuses]}
+            result = {"transports": [s.model_dump(mode="json") for s in statuses]}
+            fp = svc.sessions.p2p_fingerprint()
+            if fp:
+                result["p2p_fingerprint"] = fp
+                result["p2p_listen_port"] = svc.config.p2p.listen_port
+            return result
 
         if method == "connection.reconnect":
             await svc.sessions.reconnect()

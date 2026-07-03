@@ -2,10 +2,15 @@
 directory = "~/.local/share/xmpp-p2p-chat"
 
 [connection]
-default_transport = "xmpp-server"
+default_transport = "direct-p2p"
 api_host = "127.0.0.1"
 api_port = 8765
 api_token = ""
+
+[p2p]
+local_jid = "alice@p2p.local"
+listen_host = "0.0.0.0"
+listen_port = 5223
 
 [logging]
 level = "INFO"
@@ -13,11 +18,11 @@ file = ""
 
 [security]
 enforce_tls = true
-allow_self_signed_direct = false
+allow_self_signed_direct = true
 
 [xmpp]
-# Local user JID for this client instance (required for sending messages)
-jid = "alice@localhost"
-password = "alice"
-server = "localhost"
+# Optional fallback — leave empty for pure serverless P2P mode
+jid = ""
+password = ""
+server = ""
 port = 5222
