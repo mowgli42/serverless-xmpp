@@ -2,21 +2,22 @@
 
 **A privacy-first, serverless XMPP chat client with a decoupled connection service and multiple user interfaces (text TUI + modern web SPA).**
 
-Uses pre-placed local address books to start peer-to-peer style chats (server-mediated XMPP for MVP, with architecture ready for direct P2P streams). Built for trusted circles who want control over their data and infrastructure.
+Uses pre-placed local address books to start peer-to-peer chats over **direct TLS streams** (default), with optional fallback to a traditional XMPP server. Built for trusted circles who want control over their data and infrastructure.
 
-> **Status**: MVP with **direct P2P (serverless) transport** — peers connect over TLS without a central XMPP server. XMPP server mode remains available as fallback.
+> **Status**: MVP with **direct P2P (serverless) transport**, address book packaging with version/hash verification, TUI address book management, and PyInstaller distribution.
 
 ## Key Features
 
-- **Pre-placed Address Books** — Local JSON files (human-editable) define your contacts. No reliance on server rosters.
+- **Pre-placed Address Books** — Local JSON files (human-editable) define your contacts. Version + SHA256 hash with visual 8×8 fingerprint grid in both UIs. Bundled default imported on first run.
 - **Decoupled Architecture** — Connection Service handles all XMPP logic, transports, sessions, and persistence. UIs are thin clients.
 - **Multiple UIs**:
-  - Keyboard-first **Text TUI** (Textual) — perfect for terminals, SSH, low-resource devices.
-  - Modern **Web SPA** (Svelte + Vite + Tailwind) — rich chat experience, works in any browser.
-- **Serverless Operation** — Zero hosted backend required. Connect to public/self-hosted XMPP servers or (future) direct P2P.
+  - Keyboard-first **Text TUI** (Textual) — chat, contact search, full address book screen (`a`), create/remove contacts, hash grid in sidebar.
+  - Modern **Web SPA** (Svelte + Vite + Tailwind) — rich chat experience, settings panel with address book hash and reload.
+- **Serverless Operation** — Direct P2P over TLS without a central server; optional XMPP server client mode for Prosody/ejabberd.
 - **Offline Resilience** — Message queuing, local history (SQLite), automatic retry.
 - **Privacy & Security** — Local data only, TLS enforced, localhost-only API, no telemetry.
-- **Extensible** — Pluggable transports; easy to add direct P2P, E2EE, new UIs.
+- **Packaging** — PyInstaller bundle ships bundled address book + embedded Web UI ([docs/packaging.md](docs/packaging.md)).
+- **Extensible** — Pluggable transports; mDNS LAN discovery; easy to add E2EE and new UIs.
 
 ## Screenshots
 
@@ -25,6 +26,22 @@ Uses pre-placed local address books to start peer-to-peer style chats (server-me
 | ![Text TUI](docs/screenshots/text-ui.png) | ![Web UI](docs/screenshots/web-ui.png) |
 
 Regenerate with `./scripts/capture-screenshots.sh` (requires a running Connection Service and `playwright` + `cairosvg`). Intermediate `.svg` files are gitignored.
+
+### Text TUI keyboard shortcuts
+
+| Key | Action |
+|-----|--------|
+| `a` | Open **Address Book** — list contacts, version, hash grid, file path |
+| `n` | **New contact** (from main screen or address book) |
+| `Delete` | Remove selected contact (address book screen) |
+| `r` | Refresh contacts / reload address book from disk |
+| `Enter` | Open chat with selected contact |
+| `c` | Focus contact list |
+| `/` | Focus message input |
+| `?` | Help overlay |
+| `q` | Quit TUI (service keeps running) |
+
+The sidebar shows contact count, address book **version** (`v{N}`), and an **8×8 color hash grid** so you can verify you have the latest distributed contact list.
 
 ## Quick Start
 
@@ -51,7 +68,7 @@ cd web_ui && npm install && npm run build
 # Service auto-serves web_ui/dist when [ui] serve_web = true
 ```
 
-Full details: [docs/quick-start.md](docs/quick-start.md) · **Architecture**: [docs/architecture.md](docs/architecture.md) · **Serverless P2P**: [docs/p2p-serverless.md](docs/p2p-serverless.md)
+Full details: [docs/quick-start.md](docs/quick-start.md) · **Architecture**: [docs/architecture.md](docs/architecture.md) · **Packaging**: [docs/packaging.md](docs/packaging.md) · **Serverless P2P**: [docs/p2p-serverless.md](docs/p2p-serverless.md)
 
 ## Serverless P2P (No XMPP Server)
 
@@ -85,26 +102,33 @@ See [docs/multi-client-testing.md](docs/multi-client-testing.md).
 
 ```
 UIs (Text TUI / Web SPA)
-        ↓ WebSocket + JSON-RPC
-Connection Service (Python + slixmpp)
-        ↓ Pluggable Transports
-XMPP Servers  ←→  (Future) Direct P2P Peers
+        ↓ WebSocket + JSON-RPC (localhost)
+Connection Service (Python)
+  ├─ Address Book (JSON + version/hash)
+  ├─ SQLite persistence
+  └─ Pluggable transports
+        ↓                    ↓
+Direct P2P peers      External XMPP server
+(TLS + XML streams)   (slixmpp client)
 ```
 
-Full details in `openspec/changes/serverless-xmpp-p2p-chat-client/design.md`.
+Diagrams and sequence charts: [docs/architecture.md](docs/architecture.md)
 
 ## Project Structure
 
 ```
 serverless-xmpp/
 ├── src/xmpp_p2p_chat/
-│   ├── connection_service/   # Core daemon, XMPP transport, WebSocket API
-│   ├── text_ui/              # Textual TUI
-│   └── common/               # Config, models, API client
-├── web_ui/                   # Svelte 5 SPA
+│   ├── connection_service/   # Core daemon, transports, WebSocket API
+│   ├── text_ui/              # Textual TUI + address book screens
+│   ├── share/                # Bundled default addressbook.json
+│   └── common/               # Config, models, hash helpers, API client
+├── web_ui/                   # Svelte 5 SPA (HashGrid, settings)
 ├── tests/                    # pytest unit + API integration tests
+├── docs/diagrams/            # Architecture PlantUML sources + PNGs
 ├── docker/                   # Prosody for local testing
-├── scripts/                  # Multi-client test harness
+├── packaging/                # PyInstaller spec + launcher
+├── scripts/                  # Test harness, screenshot + diagram render
 ├── examples/                 # Sample config + addressbook
 └── openspec/                 # Spec-driven development artifacts
 ```
@@ -134,7 +158,9 @@ This project follows the [OpenSpec](https://github.com/Fission-AI/OpenSpec) work
 - [x] Multi-client test harness (Docker Prosody + scripts)
 - [x] MVP: Direct P2P transport (TLS + XMPP streams, mutual peer connections)
 - [x] mDNS LAN discovery (zeroconf)
-- [ ] Packaging & distribution
+- [x] TUI address book screen (create, view, remove, hash grid)
+- [x] Address book packaging — bundled import, version/hash, visual fingerprint
+- [x] PyInstaller packaging & distribution ([docs/packaging.md](docs/packaging.md))
 - [x] Embedded web UI server
 - [ ] Per-chat E2EE (stretch)
 

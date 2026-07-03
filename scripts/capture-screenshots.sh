@@ -12,6 +12,10 @@ API_PORT=8765
 WEB_PORT=8767
 P2P_PORT=15299
 
+# Release default doc ports if a previous capture left them bound
+fuser -k "${API_PORT}/tcp" "${WEB_PORT}/tcp" "${P2P_PORT}/tcp" 2>/dev/null || true
+sleep 0.5
+
 mkdir -p "$CONFIG_DIR" "$OUT_DIR"
 
 "$ROOT/.venv/bin/python" "$ROOT/scripts/seed-screenshot-data.py" "$DATA_DIR"

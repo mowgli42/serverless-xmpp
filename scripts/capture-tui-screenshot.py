@@ -23,9 +23,9 @@ class ScreenshotApp(ChatApp):
     async def on_ready(self) -> None:
         await asyncio.sleep(2.5)
         self._load_contacts()
-        for _ in range(20):
+        for _ in range(30):
             await asyncio.sleep(0.5)
-            if self.contacts:
+            if self.contacts and self.addressbook_status.get("content_hash"):
                 break
 
         if self.contacts:
