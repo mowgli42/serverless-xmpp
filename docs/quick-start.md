@@ -44,6 +44,17 @@ The API listens on `ws://127.0.0.1:8765/rpc`. If `web_ui/dist` exists, the SPA i
 python -m xmpp_p2p_chat.text_ui
 ```
 
+| Key | Action |
+|-----|--------|
+| `a` | Open **Address Book** — status, warnings, browse/add/remove contacts |
+| `n` | Create new contact (quick form) |
+| `c` | Focus contact list |
+| `/` | Focus message input |
+| `r` | Refresh contacts |
+| `?` | Show all shortcuts |
+
+Inside the address book screen: `n` new · `delete` remove · `Enter` open chat · `r` refresh · `Esc` close.
+
 **Terminal 3 — Web UI (dev mode alternative)**
 
 ```bash

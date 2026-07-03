@@ -10,31 +10,91 @@ from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.message import Message
 from textual.widgets import Footer, Header, Input, Label, ListItem, ListView, Static
 
 from xmpp_p2p_chat.common.api_client import APIClient
 from xmpp_p2p_chat.common.config import load_config
+from xmpp_p2p_chat.text_ui.screens.addressbook import (
+    AddContactScreen,
+    AddressBookScreen,
+    presence_symbol,
+    transport_label,
+)
 
 logger = logging.getLogger(__name__)
 
 
-class ContactSelected(Message):
-    def __init__(self, contact_id: str, name: str) -> None:
-        super().__init__()
-        self.contact_id = contact_id
-        self.name = name
-
-
 class ChatApp(App):
     CSS = """
+    Screen {
+        background: $surface;
+    }
     #sidebar {
-        width: 30;
+        width: 36;
+        min-width: 28;
         border-right: solid $primary;
+        background: $panel;
+    }
+    #sidebar-header {
+        padding: 0 1;
+        height: auto;
+        border-bottom: solid $primary-darken-2;
+        background: $boost;
+    }
+    #contacts-title {
+        text-style: bold;
+        color: $accent;
+        padding: 1 0 0 0;
+    }
+    #contact-summary {
+        color: $text-muted;
+        padding: 0 0 1 0;
+    }
+    #contact-filter {
+        margin: 0 1 1 1;
+    }
+    #contact-list {
+        height: 1fr;
+        scrollbar-gutter: stable;
+    }
+    #contact-list ListItem {
+        padding: 0 1;
+        height: auto;
+        min-height: 3;
+    }
+    #contact-list ListItem.--highlight {
+        background: $primary 20%;
+    }
+    .contact-name {
+        text-style: bold;
+    }
+    .contact-meta {
+        color: $text-muted;
+    }
+    #main-pane {
+        width: 1fr;
+    }
+    #chat-header {
+        padding: 1;
+        border-bottom: solid $primary-darken-2;
+        background: $boost;
+        height: auto;
+    }
+    #chat-title {
+        text-style: bold;
+        color: $text;
+    }
+    #chat-subtitle {
+        color: $text-muted;
+    }
+    #chat-scroll {
+        height: 1fr;
+        border: solid $primary-darken-3;
+        margin: 0 1;
     }
     #chat-log {
-        height: 1fr;
         padding: 1;
+        width: 100%;
     }
     .msg-in {
         color: $text;
@@ -43,11 +103,18 @@ class ChatApp(App):
         color: $success;
         text-style: bold;
     }
+    .msg-time {
+        color: $text-muted;
+    }
+    #message-input {
+        margin: 1;
+        border: tall $primary;
+    }
     #status-bar {
         dock: bottom;
         height: 1;
-        background: $surface;
-        color: $text-muted;
+        background: $primary-darken-3;
+        color: $text;
         padding: 0 1;
     }
     """
@@ -55,10 +122,14 @@ class ChatApp(App):
     BINDINGS = [
         Binding("q", "quit", "Quit"),
         Binding("c", "focus_contacts", "Contacts"),
+        Binding("a", "open_addressbook", "Address Book"),
+        Binding("n", "new_contact", "New contact"),
         Binding("slash", "focus_input", "Message"),
         Binding("r", "refresh_contacts", "Refresh"),
         Binding("question_mark", "show_help", "Help"),
     ]
+
+    TITLE = "Serverless XMPP"
 
     def __init__(self, api_url: str | None = None, token: str = "") -> None:
         super().__init__()
@@ -68,8 +139,9 @@ class ChatApp(App):
         self.client = APIClient(self.api_url, self.token)
         self.contacts: list[dict] = []
         self.presence: dict[str, dict] = {}
+        self.health: dict = {}
         self.current_chat_id: str | None = None
-        self.current_contact_name: str = ""
+        self.current_contact: dict | None = None
         self.messages: list[dict] = []
         self.contact_filter: str = ""
 
@@ -77,20 +149,29 @@ class ChatApp(App):
         yield Header(show_clock=True)
         with Horizontal():
             with Vertical(id="sidebar"):
-                yield Label("Contacts", id="contacts-title")
-                yield Input(placeholder="Filter contacts...", id="contact-filter")
+                with Vertical(id="sidebar-header"):
+                    yield Label("Contacts", id="contacts-title")
+                    yield Static("Loading…", id="contact-summary")
+                yield Input(placeholder="Search name or JID…", id="contact-filter")
                 yield ListView(id="contact-list")
-            with Vertical():
-                yield Label("Select a contact", id="chat-title")
-                yield VerticalScroll(Static("", id="chat-log"))
-                yield Input(placeholder="Type a message and press Enter...", id="message-input")
-        yield Static("Connecting to service...", id="status-bar")
+            with Vertical(id="main-pane"):
+                with Vertical(id="chat-header"):
+                    yield Label("Select a contact to chat", id="chat-title")
+                    yield Static("", id="chat-subtitle")
+                with VerticalScroll(id="chat-scroll"):
+                    yield Static("[dim]Pick a contact from the sidebar, or press [bold]a[/] for address book.[/]", id="chat-log")
+                yield Input(
+                    placeholder="Type a message and press Enter…",
+                    id="message-input",
+                    disabled=True,
+                )
+        yield Static("Connecting to service…", id="status-bar")
         yield Footer()
 
     async def on_mount(self) -> None:
         self.client.on_event(self._handle_event)
         asyncio.create_task(self.client.connect())
-        self.set_interval(3, self._refresh_status)
+        self.set_interval(5, self._refresh_status)
 
     @work(exclusive=True)
     async def _load_contacts(self) -> None:
@@ -98,22 +179,45 @@ class ChatApp(App):
             result = await self.client.call("addressbook.list")
             self.contacts = result.get("contacts", [])
             self.presence = result.get("presence", {})
+            try:
+                self.health = await self.client.call("system.health")
+            except Exception:
+                self.health = {}
             await self._render_contacts()
-            self.query_one("#status-bar", Static).update(f"Connected · {len(self.contacts)} contacts")
+            self._update_contact_summary()
         except Exception as exc:  # noqa: BLE001
-            self.query_one("#status-bar", Static).update(f"Error: {exc}")
+            self.query_one("#status-bar", Static).update(f"[red]Error: {exc}[/]")
+
+    def _update_contact_summary(self) -> None:
+        count = len(self.contacts)
+        warnings = len(self.health.get("warnings") or [])
+        warn = f" · [yellow]{warnings} warning(s)[/]" if warnings else ""
+        online = sum(1 for c in self.contacts if self.presence.get(c["id"], {}).get("show") == "available")
+        self.query_one("#contact-summary", Static).update(
+            f"{count} contact{'s' if count != 1 else ''} · {online} online{warn}"
+        )
 
     async def _render_contacts(self) -> None:
         list_view = self.query_one("#contact-list", ListView)
         await list_view.clear()
         needle = self.contact_filter.lower()
         for contact in self.contacts:
-            if needle and needle not in contact["name"].lower() and needle not in contact["jid"].lower():
+            name = contact.get("name", "?")
+            jid = contact.get("jid", "?")
+            if needle and needle not in name.lower() and needle not in jid.lower():
                 continue
-            pres = self.presence.get(contact["id"], {})
+            cid = contact["id"]
+            pres = self.presence.get(cid, {})
             show = pres.get("show", "offline")
-            label = f"[{'green' if show == 'available' else 'dim'}]●[/] {contact['name']}"
-            await list_view.append(ListItem(Label(label), id=f"contact-{contact['id']}"))
+            sym = presence_symbol(show)
+            sym_color = "green" if show == "available" else ("yellow" if show == "away" else "dim")
+            transport = transport_label(contact)
+            label = (
+                f"[{sym_color}]{sym}[/] [bold]{name}[/]\n"
+                f"[dim]{jid}[/]\n"
+                f"[dim italic]{transport}[/]"
+            )
+            await list_view.append(ListItem(Label(label), id=f"contact-{cid}"))
 
     @on(Input.Changed, "#contact-filter")
     async def on_contact_filter_changed(self, event: Input.Changed) -> None:
@@ -129,10 +233,19 @@ class ChatApp(App):
         contact = next((c for c in self.contacts if c["id"] == contact_id), None)
         if not contact:
             return
-        self.current_chat_id = contact_id
-        self.current_contact_name = contact["name"]
+        await self._select_contact(contact)
+
+    async def _select_contact(self, contact: dict) -> None:
+        self.current_chat_id = contact["id"]
+        self.current_contact = contact
         self.query_one("#chat-title", Label).update(f"Chat with {contact['name']}")
-        await self._open_chat(contact_id)
+        pres = self.presence.get(contact["id"], {})
+        show = pres.get("show", "offline")
+        self.query_one("#chat-subtitle", Static).update(
+            f"{contact['jid']} · {transport_label(contact)} · {presence_symbol(show)} {show}"
+        )
+        self.query_one("#message-input", Input).disabled = False
+        await self._open_chat(contact["id"])
 
     async def _open_chat(self, contact_id: str) -> None:
         await self.client.call("chat.start", {"contact_id": contact_id})
@@ -142,6 +255,9 @@ class ChatApp(App):
 
     async def _render_messages(self) -> None:
         log = self.query_one("#chat-log", Static)
+        if not self.messages:
+            log.update("[dim]No messages yet. Say hello![/]")
+            return
         lines = []
         for msg in self.messages:
             ts = msg.get("timestamp", "")
@@ -149,14 +265,22 @@ class ChatApp(App):
                 try:
                     ts = datetime.fromisoformat(ts.replace("Z", "+00:00")).strftime("%H:%M")
                 except ValueError:
-                    pass
+                    ts = ts[:5] if len(ts) >= 5 else ts
             direction = msg.get("direction", "in")
-            prefix = "You" if direction == "out" else self.current_contact_name
+            name = "You" if direction == "out" else (self.current_contact or {}).get("name", "Peer")
             style = "msg-out" if direction == "out" else "msg-in"
             status = msg.get("status", "")
-            marker = " ✓" if status == "delivered" else (" …" if status == "pending" else "")
-            lines.append(f"[{style}]{ts} {prefix}: {msg['body']}{marker}[/]")
-        log.update("\n".join(lines) if lines else "[dim]No messages yet. Say hello![/]")
+            marker = " [green]✓[/]" if status in ("delivered", "sent") else (
+                " [yellow]…[/]" if status == "pending" else ""
+            )
+            align = "right" if direction == "out" else "left"
+            lines.append(
+                f"[{style}][{align}][dim]{ts}[/dim] {name}:[/{align}]\n"
+                f"[{style}][{align}]{msg['body']}{marker}[/{align}][/{style}]"
+            )
+        log.update("\n\n".join(lines))
+        scroll = self.query_one("#chat-scroll", VerticalScroll)
+        scroll.scroll_end(animate=False)
 
     @on(Input.Submitted, "#message-input")
     async def on_message_submit(self, event: Input.Submitted) -> None:
@@ -180,7 +304,7 @@ class ChatApp(App):
             self.messages[-1] = sent
             await self._render_messages()
         except Exception as exc:  # noqa: BLE001
-            self.query_one("#status-bar", Static).update(f"Send failed: {exc}")
+            self.notify(f"Send failed: {exc}", severity="error")
 
     def _handle_event(self, event: str, params: dict) -> None:
         if event == "message.received" and params.get("chat_id") == self.current_chat_id:
@@ -198,7 +322,9 @@ class ChatApp(App):
         elif event == "connection.changed":
             state = params.get("state", "unknown")
             self.call_from_thread(
-                lambda: self.query_one("#status-bar", Static).update(f"XMPP: {state}")
+                lambda: self.query_one("#status-bar", Static).update(
+                    f"Transport: {state} · {len(self.contacts)} contacts"
+                )
             )
 
     def _render_messages_sync(self) -> None:
@@ -208,26 +334,46 @@ class ChatApp(App):
         try:
             result = await self.client.call("connection.status")
             transports = result.get("transports", [])
-            if transports:
-                parts = [f"{t.get('transport', '?')}:{t.get('state', '?')}" for t in transports]
-                self.query_one("#status-bar", Static).update(
-                    f"{' · '.join(parts)} · {len(self.contacts)} contacts"
-                )
+            parts = [f"{t.get('transport', '?')}:{t.get('state', '?')}" for t in transports]
+            health = await self.client.call("system.health")
+            self.health = health
+            self._update_contact_summary()
+            outbox = health.get("pending_outbox", 0)
+            line = f"{' · '.join(parts)} · {len(self.contacts)} contacts"
+            if outbox:
+                line += f" · [yellow]outbox {outbox}[/]"
+            self.query_one("#status-bar", Static).update(line)
         except Exception:
-            self.query_one("#status-bar", Static).update("Service unavailable — retrying...")
+            self.query_one("#status-bar", Static).update("[red]Service unavailable — retrying…[/]")
+
+    async def action_open_addressbook(self) -> None:
+        contact_id = await self.push_screen_wait(AddressBookScreen(self.client))
+        if contact_id:
+            contact = next((c for c in self.contacts if c["id"] == contact_id), None)
+            if contact:
+                await self._select_contact(contact)
+            else:
+                self._load_contacts()
+
+    async def action_new_contact(self) -> None:
+        result = await self.push_screen_wait(AddContactScreen(self.client))
+        if result:
+            self._load_contacts()
+            self.notify(f"Added contact: {result}")
 
     def action_show_help(self) -> None:
         self.notify(
-            "q=quit · c=contacts · /=message · r=refresh · ?=help · Enter=send",
+            "a=address book · n=new contact · c=contacts · /=message · r=refresh · ?=help",
             title="Keyboard shortcuts",
-            timeout=8,
+            timeout=10,
         )
 
     def action_focus_contacts(self) -> None:
         self.query_one("#contact-list", ListView).focus()
 
     def action_focus_input(self) -> None:
-        self.query_one("#message-input", Input).focus()
+        if not self.query_one("#message-input", Input).disabled:
+            self.query_one("#message-input", Input).focus()
 
     def action_refresh_contacts(self) -> None:
         self._load_contacts()
