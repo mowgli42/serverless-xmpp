@@ -12,6 +12,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Footer, Header, Input, Label, ListItem, ListView, Static
 
+from xmpp_p2p_chat.common.addressbook_hash import render_hash_grid_rich
 from xmpp_p2p_chat.common.api_client import APIClient
 from xmpp_p2p_chat.common.config import load_config
 from xmpp_p2p_chat.text_ui.screens.addressbook import (
@@ -48,7 +49,12 @@ class ChatApp(App):
     }
     #contact-summary {
         color: $text-muted;
+        padding: 0 0 0 0;
+    }
+    #addressbook-hash {
+        height: auto;
         padding: 0 0 1 0;
+        color: $text-muted;
     }
     #contact-filter {
         margin: 0 1 1 1;
@@ -140,6 +146,7 @@ class ChatApp(App):
         self.contacts: list[dict] = []
         self.presence: dict[str, dict] = {}
         self.health: dict = {}
+        self.addressbook_status: dict = {}
         self.current_chat_id: str | None = None
         self.current_contact: dict | None = None
         self.messages: list[dict] = []
@@ -152,6 +159,7 @@ class ChatApp(App):
                 with Vertical(id="sidebar-header"):
                     yield Label("Contacts", id="contacts-title")
                     yield Static("Loading…", id="contact-summary")
+                    yield Static("", id="addressbook-hash")
                 yield Input(placeholder="Search name or JID…", id="contact-filter")
                 yield ListView(id="contact-list")
             with Vertical(id="main-pane"):
@@ -179,22 +187,38 @@ class ChatApp(App):
             result = await self.client.call("addressbook.list")
             self.contacts = result.get("contacts", [])
             self.presence = result.get("presence", {})
+            self.addressbook_status = result.get("status") or {}
             try:
                 self.health = await self.client.call("system.health")
             except Exception:
                 self.health = {}
             await self._render_contacts()
             self._update_contact_summary()
+            self._update_hash_display()
         except Exception as exc:  # noqa: BLE001
             self.query_one("#status-bar", Static).update(f"[red]Error: {exc}[/]")
 
     def _update_contact_summary(self) -> None:
         count = len(self.contacts)
-        warnings = len(self.health.get("warnings") or [])
-        warn = f" · [yellow]{warnings} warning(s)[/]" if warnings else ""
+        version = self.addressbook_status.get("version", "?")
+        warnings = len(self.health.get("warnings") or []) + len(
+            self.addressbook_status.get("warnings") or []
+        )
+        warn = f" · [yellow]{warnings} warn[/]" if warnings else ""
         online = sum(1 for c in self.contacts if self.presence.get(c["id"], {}).get("show") == "available")
         self.query_one("#contact-summary", Static).update(
-            f"{count} contact{'s' if count != 1 else ''} · {online} online{warn}"
+            f"v{version} · {count} contacts · {online} online{warn}"
+        )
+
+    def _update_hash_display(self) -> None:
+        widget = self.query_one("#addressbook-hash", Static)
+        content_hash = self.addressbook_status.get("content_hash", "")
+        if not content_hash:
+            widget.update("")
+            return
+        short = content_hash.replace("SHA256:", "")[:12]
+        widget.update(
+            f"[dim]Book hash {short}…[/]\n" + render_hash_grid_rich(content_hash, grid=8)
         )
 
     async def _render_contacts(self) -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import socket
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -28,13 +29,22 @@ from xmpp_p2p_chat.connection_service.session import SessionManager
 from xmpp_p2p_chat.connection_service.transports.base import BaseTransport
 
 
-def _service_config(tmp_path: Path, port: int) -> Path:
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def _service_config(tmp_path: Path, port: int, p2p_port: int | None = None) -> Path:
     data_dir = tmp_path / "data"
+    if p2p_port is None:
+        p2p_port = _free_port()
     config_file = tmp_path / "config.toml"
     config_file.write_text(
         f"""
 [data]
 directory = "{data_dir}"
+import_bundled_if_empty = false
 
 [connection]
 api_host = "127.0.0.1"
@@ -43,8 +53,11 @@ api_port = {port}
 [p2p]
 local_jid = "alice@p2p.local"
 listen_host = "127.0.0.1"
-listen_port = 15230
+listen_port = {p2p_port}
 mdns_enabled = false
+
+[ui]
+serve_web = false
 
 [xmpp]
 jid = ""
@@ -67,9 +80,11 @@ async def _rpc(method: str, params: dict | None = None, port: int = 18766):
 
 @pytest.fixture
 async def service(tmp_path: Path):
-    cfg = load_config(_service_config(tmp_path, 18766))
+    api_port = _free_port()
+    cfg = load_config(_service_config(tmp_path, api_port))
     svc = ConnectionService(cfg)
     await svc.start()
+    svc._test_api_port = api_port  # noqa: SLF001 — test helper
     yield svc
     await svc.shutdown()
 
@@ -77,7 +92,8 @@ async def service(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_history_after_service_restart(tmp_path: Path):
     """Spec: chat history survives service restart."""
-    config_file = _service_config(tmp_path, 18767)
+    api_port = _free_port()
+    config_file = _service_config(tmp_path, api_port)
     cfg = load_config(config_file)
 
     svc1 = ConnectionService(cfg)
@@ -100,7 +116,7 @@ async def test_history_after_service_restart(tmp_path: Path):
     svc2 = ConnectionService(load_config(config_file))
     await svc2.start()
     try:
-        result = await _rpc("chat.get_history", {"chat_id": "bob", "limit": 10}, port=18767)
+        result = await _rpc("chat.get_history", {"chat_id": "bob", "limit": 10}, port=api_port)
         messages = result["result"]["messages"]
         assert len(messages) == 1
         assert messages[0]["body"] == "Before restart"
@@ -111,7 +127,7 @@ async def test_history_after_service_restart(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_dual_client_addressbook_sync(service: ConnectionService):
     """Spec: multiple UIs stay in sync via push notifications."""
-    uri = "ws://127.0.0.1:18766/rpc"
+    uri = f"ws://127.0.0.1:{service._test_api_port}/rpc"  # noqa: SLF001
     async with websockets.connect(uri) as ws1, websockets.connect(uri) as ws2:
         await ws1.send(
             json.dumps(
@@ -184,7 +200,7 @@ async def test_outbox_drains_on_transport_reconnect(tmp_path: Path):
     def on_push(event: str, params: dict) -> None:
         pushes.append((event, params))
 
-    cfg = load_config(_service_config(tmp_path, 18768))
+    cfg = load_config(_service_config(tmp_path, _free_port(), p2p_port=_free_port()))
     cfg.p2p.mdns_enabled = False
     sessions = SessionManager(cfg, ab, db, on_push)
     await sessions.initialize()

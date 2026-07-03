@@ -11,6 +11,7 @@ from typing import Any
 import websockets
 
 from xmpp_p2p_chat.common.config import AppConfig, load_config
+from xmpp_p2p_chat.common.paths import bundled_addressbook_path
 from xmpp_p2p_chat.connection_service.addressbook import AddressBookManager
 from xmpp_p2p_chat.connection_service.api import RpcServer
 from xmpp_p2p_chat.connection_service.persistence import PersistenceManager
@@ -56,9 +57,24 @@ class ConnectionService:
         asyncio.create_task(self.rpc.broadcast(event, params))
 
     def _on_addressbook_updated(self) -> None:
+        status = self.addressbook.status().model_dump(mode="json")
         asyncio.create_task(
-            self.rpc.broadcast("addressbook.updated", {"contacts": len(self.addressbook.contacts)})
+            self.rpc.broadcast(
+                "addressbook.updated",
+                {
+                    "contacts": len(self.addressbook.contacts),
+                    "version": status["version"],
+                    "content_hash": status["content_hash"],
+                },
+            )
         )
+
+    def _resolve_bundled_addressbook(self) -> Path | None:
+        if self.config.bundled_addressbook:
+            path = Path(self.config.bundled_addressbook).expanduser()
+            if path.exists():
+                return path.resolve()
+        return bundled_addressbook_path()
 
     def _resolve_web_root(self) -> Path | None:
         if self.config.ui.web_root:
@@ -71,7 +87,10 @@ class ConnectionService:
             format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
         )
 
-        self.addressbook.load()
+        self.addressbook.process_startup(
+            bundled_path=self._resolve_bundled_addressbook(),
+            import_if_empty=self.config.import_bundled_if_empty,
+        )
         await self.persistence.initialize()
         await self.sessions.initialize()
 

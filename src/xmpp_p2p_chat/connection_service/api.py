@@ -93,10 +93,19 @@ class RpcServer:
             for c in contacts:
                 show, status = await svc.persistence.get_presence(c.id)
                 presence_map[c.id] = {"show": show, "status": status}
+            ab_status = svc.addressbook.status().model_dump(mode="json")
             return {
                 "contacts": [c.model_dump(mode="json") for c in contacts],
                 "presence": presence_map,
+                "status": ab_status,
             }
+
+        if method == "addressbook.status":
+            return svc.addressbook.status().model_dump(mode="json")
+
+        if method == "addressbook.reload":
+            svc.addressbook.reload()
+            return svc.addressbook.status().model_dump(mode="json")
 
         if method == "addressbook.add":
             contact_data = params.get("contact", params)

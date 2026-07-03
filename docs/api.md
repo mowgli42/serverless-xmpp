@@ -16,7 +16,7 @@ When `api_token` is set in config, the first message after connect must be:
 
 ### `addressbook.list`
 
-Returns all contacts and last-known presence.
+Returns all contacts, last-known presence, and address book version/hash status.
 
 ```json
 // Request
@@ -26,9 +26,33 @@ Returns all contacts and last-known presence.
 {
   "result": {
     "contacts": [{"id":"bob","jid":"bob@p2p.local","name":"Bob", "...": "..."}],
-    "presence": {"bob": {"show": "available", "status": ""}}
+    "presence": {"bob": {"show": "available", "status": ""}},
+    "status": {
+      "version": 1,
+      "content_hash": "SHA256:abc123...",
+      "hash_blocks": ["#a1b2c3", "..."],
+      "contact_count": 1,
+      "primary_path": "/path/to/addressbook.json",
+      "warnings": []
+    }
   }
 }
+```
+
+### `addressbook.status`
+
+Returns version, content hash, hash visualization blocks, and file paths without listing contacts.
+
+```json
+{"jsonrpc":"2.0","id":"1","method":"addressbook.status","params":{}}
+```
+
+### `addressbook.reload`
+
+Re-reads the address book from disk (after external edits) and broadcasts `addressbook.updated`.
+
+```json
+{"jsonrpc":"2.0","id":"1","method":"addressbook.reload","params":{}}
 ```
 
 ### `addressbook.add`
@@ -142,7 +166,7 @@ No `id` field — these are notifications:
 | `message.received` | `{chat_id, message}` |
 | `message.updated` | `{chat_id, message}` |
 | `presence.updated` | `{contact_id, show, status}` |
-| `addressbook.updated` | `{contacts: N}` |
+| `addressbook.updated` | `{contacts, version, content_hash}` |
 | `connection.changed` | transport status object |
 | `discovery.updated` | `{peers: [...]}` |
 

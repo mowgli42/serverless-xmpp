@@ -1,10 +1,12 @@
 <script>
   import { onMount } from 'svelte';
   import { ChatAPI } from './lib/api.js';
+  import HashGrid from './lib/HashGrid.svelte';
 
   let api = $state(new ChatAPI());
   let contacts = $state([]);
   let presence = $state({});
+  let addressbookStatus = $state(null);
   let selectedId = $state(null);
   let selectedName = $state('');
   let messages = $state([]);
@@ -53,6 +55,7 @@
       const result = await api.call('addressbook.list');
       contacts = result.contacts || [];
       presence = result.presence || {};
+      addressbookStatus = result.status || null;
       status = 'connected';
     } catch (e) {
       status = `error: ${e.message}`;
@@ -134,6 +137,13 @@
     }
     if (event === 'addressbook.updated') {
       loadContacts();
+      if (params.content_hash) {
+        addressbookStatus = {
+          ...(addressbookStatus || {}),
+          version: params.version,
+          content_hash: params.content_hash,
+        };
+      }
     }
     if (event === 'discovery.updated') {
       discoveredPeers = params.peers || [];
@@ -180,6 +190,16 @@
       <h1 class="text-lg font-semibold">Serverless XMPP</h1>
       <p class="text-xs text-emerald-500/80">Local service mode</p>
       <p class="text-xs text-slate-400 truncate" title={status}>{status}</p>
+      {#if addressbookStatus}
+        <p class="text-xs text-slate-500 mt-1">
+          Address book v{addressbookStatus.version} · {addressbookStatus.contact_count} contacts
+        </p>
+        <HashGrid
+          contentHash={addressbookStatus.content_hash}
+          hashBlocks={addressbookStatus.hash_blocks}
+          grid={8}
+        />
+      {/if}
     </header>
     <div class="p-3">
       <input
@@ -266,7 +286,32 @@
         <h3 class="font-semibold">Settings</h3>
         <button class="text-sm text-slate-400" onclick={() => (showSettings = false)}>Close</button>
       </div>
-      <h3 class="font-semibold hidden sm:block">Service</h3>
+      <h3 class="font-semibold hidden sm:block">Address book</h3>
+      {#if addressbookStatus}
+        <div class="text-sm text-slate-400 space-y-2">
+          <p>Version: {addressbookStatus.version}</p>
+          <p class="text-xs break-all">{addressbookStatus.content_hash}</p>
+          <HashGrid
+            contentHash={addressbookStatus.content_hash}
+            hashBlocks={addressbookStatus.hash_blocks}
+            grid={8}
+          />
+          <p class="text-xs text-slate-500 break-all">File: {addressbookStatus.primary_path}</p>
+          {#if addressbookStatus.warnings?.length}
+            <ul class="text-xs text-amber-400/90 space-y-1">
+              {#each addressbookStatus.warnings as w}
+                <li>• {w}</li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+        <button class="rounded bg-slate-800 px-3 py-2 text-sm" onclick={async () => {
+          addressbookStatus = await api.call('addressbook.reload');
+          await loadContacts();
+        }}>Reload from disk</button>
+      {/if}
+
+      <h3 class="font-semibold pt-4 hidden sm:block">Service</h3>
       {#if connectionInfo?.transports?.length}
         <ul class="text-sm text-slate-400 space-y-1">
           {#each connectionInfo.transports as t}

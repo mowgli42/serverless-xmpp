@@ -114,3 +114,17 @@ class HealthStatus(BaseModel):
     active_chats: int
     pending_outbox: int
     warnings: list[str] = Field(default_factory=list)
+
+
+class AddressBookStatus(BaseModel):
+    version: int
+    content_hash: str
+    contact_count: int
+    primary_path: str
+    fragments_dir: str
+    fragment_files: list[str] = Field(default_factory=list)
+    loaded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    modified_at: datetime | None = None
+    warnings: list[str] = Field(default_factory=list)
+    hash_blocks: list[str] = Field(default_factory=list)
+    bundled_source: str | None = None

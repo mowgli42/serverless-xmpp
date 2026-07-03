@@ -1,0 +1,26 @@
+[
+  {
+    "id": "bob",
+    "jid": "bob@p2p.local",
+    "name": "Bob",
+    "tags": ["friends"],
+    "preferred_transport": "direct-p2p",
+    "direct": {
+      "host": "192.168.1.50",
+      "port": 5224,
+      "public_key_fingerprint": "SHA256:REPLACE_WITH_BOB_FINGERPRINT"
+    }
+  },
+  {
+    "id": "carol",
+    "jid": "carol@p2p.local",
+    "name": "Carol",
+    "tags": ["work"],
+    "preferred_transport": "direct-p2p",
+    "direct": {
+      "host": "192.168.1.51",
+      "port": 5225,
+      "public_key_fingerprint": "SHA256:REPLACE_WITH_CAROL_FINGERPRINT"
+    }
+  }
+]

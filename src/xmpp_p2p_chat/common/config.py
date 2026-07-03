@@ -61,6 +61,8 @@ class UIConfig:
 @dataclass
 class AppConfig:
     data_directory: Path = field(default_factory=default_data_dir)
+    bundled_addressbook: str = ""
+    import_bundled_if_empty: bool = True
     default_transport: str = "direct-p2p"
     api_host: str = "127.0.0.1"
     api_port: int = 8765
@@ -112,6 +114,11 @@ def load_config(path: Path | None = None) -> AppConfig:
 
         if data_dir := data.get("data", {}).get("directory"):
             cfg.data_directory = _expand(data_dir)
+        data_section = data.get("data", {})
+        cfg.bundled_addressbook = data_section.get("bundled_addressbook", cfg.bundled_addressbook)
+        cfg.import_bundled_if_empty = bool(
+            data_section.get("import_bundled_if_empty", cfg.import_bundled_if_empty)
+        )
 
         conn = data.get("connection", {})
         cfg.default_transport = conn.get("default_transport", cfg.default_transport)
@@ -164,7 +171,11 @@ def save_default_config(path: Path | None = None) -> Path:
     config_path = path or default_config_path()
     config_path.parent.mkdir(parents=True, exist_ok=True)
     data = {
-        "data": {"directory": str(default_data_dir())},
+        "data": {
+            "directory": str(default_data_dir()),
+            "bundled_addressbook": "",
+            "import_bundled_if_empty": True,
+        },
         "connection": {
             "default_transport": "direct-p2p",
             "api_host": "127.0.0.1",

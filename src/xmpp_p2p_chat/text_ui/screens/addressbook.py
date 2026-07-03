@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -11,8 +9,8 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Input, Label, Static
 
-if TYPE_CHECKING:
-    from xmpp_p2p_chat.common.api_client import APIClient
+from xmpp_p2p_chat.common.addressbook_hash import render_hash_grid_rich
+from xmpp_p2p_chat.common.api_client import APIClient
 
 
 def presence_symbol(show: str) -> str:
@@ -226,6 +224,11 @@ class AddressBookScreen(ModalScreen[str | None]):
         border: solid $primary-darken-2;
         background: $panel;
     }
+    #ab-hash {
+        height: auto;
+        padding: 0 1 1 1;
+        margin-bottom: 1;
+    }
     #ab-table {
         height: 1fr;
         min-height: 10;
@@ -254,11 +257,13 @@ class AddressBookScreen(ModalScreen[str | None]):
         self.presence: dict[str, dict] = {}
         self.health: dict = {}
         self.connection: dict = {}
+        self.ab_status: dict = {}
 
     def compose(self) -> ComposeResult:
         with Vertical(id="ab-dialog"):
             yield Label("Address Book — Status & Contacts", id="ab-title")
             yield Static("Loading…", id="ab-status")
+            yield Static("", id="ab-hash")
             yield DataTable(id="ab-table", cursor_type="row", zebra_stripes=True)
             yield Static("[dim]Select a contact · Enter opens chat · n=new · delete=remove[/dim]", id="ab-detail")
             with Horizontal(id="ab-actions"):
@@ -278,6 +283,7 @@ class AddressBookScreen(ModalScreen[str | None]):
             listed = await self.client.call("addressbook.list")
             self.contacts = listed.get("contacts", [])
             self.presence = listed.get("presence", {})
+            self.ab_status = listed.get("status") or await self.client.call("addressbook.status")
             self.health = await self.client.call("system.health")
             self.connection = await self.client.call("connection.status")
         except Exception as exc:  # noqa: BLE001
@@ -290,8 +296,10 @@ class AddressBookScreen(ModalScreen[str | None]):
 
     def _render_status(self) -> None:
         ok = self.health.get("ok", True)
-        count = self.health.get("contact_count", len(self.contacts))
-        warnings = self.health.get("warnings") or []
+        count = self.ab_status.get("contact_count", len(self.contacts))
+        version = self.ab_status.get("version", 0)
+        content_hash = self.ab_status.get("content_hash", "")
+        warnings = (self.ab_status.get("warnings") or []) + (self.health.get("warnings") or [])
         outbox = self.health.get("pending_outbox", 0)
         uptime = int(self.health.get("uptime_seconds", 0))
         transports = self.connection.get("transports") or []
@@ -310,10 +318,23 @@ class AddressBookScreen(ModalScreen[str | None]):
             if len(warnings) > 4:
                 warn_block += f"\n[dim]…and {len(warnings) - 4} more warnings[/]"
 
+        primary = self.ab_status.get("primary_path", "")
+        path_line = f"\n[dim]File: {primary}[/]" if primary else ""
+
         self.query_one("#ab-status", Static).update(
-            f"{status_icon}  [bold]{count}[/] contacts · outbox {outbox} · uptime {uptime}s\n"
-            f"Transports: {transport_line}{fp_line}{warn_block}"
+            f"{status_icon}  [bold]v{version}[/] · {count} contacts · outbox {outbox} · uptime {uptime}s\n"
+            f"Transports: {transport_line}{fp_line}{path_line}{warn_block}"
         )
+
+        hash_widget = self.query_one("#ab-hash", Static)
+        if content_hash:
+            short = content_hash.replace("SHA256:", "")[:16]
+            hash_widget.update(
+                f"[bold]Content fingerprint[/] [dim]({short}…)[/]\n"
+                + render_hash_grid_rich(content_hash, grid=8)
+            )
+        else:
+            hash_widget.update("")
 
     def _render_table(self) -> None:
         table = self.query_one("#ab-table", DataTable)
@@ -360,8 +381,12 @@ class AddressBookScreen(ModalScreen[str | None]):
             self._render_detail(str(event.row_key.value))
 
     async def action_refresh(self) -> None:
+        try:
+            await self.client.call("addressbook.reload")
+        except Exception:
+            pass
         await self.refresh_data()
-        self.notify("Address book refreshed")
+        self.notify("Address book reloaded from disk")
 
     async def action_new_contact(self) -> None:
         result = await self.app.push_screen_wait(AddContactScreen(self.client))

@@ -13,7 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 def find_web_ui_dist() -> Path | None:
-    """Locate web_ui/dist from a dev checkout or explicit install layout."""
+    """Locate web_ui/dist from packaged bundle, env, or dev checkout."""
+    from xmpp_p2p_chat.common.paths import bundled_web_ui_path
+
+    bundled = bundled_web_ui_path()
+    if bundled:
+        return bundled
+
     module_root = Path(__file__).resolve()
     for parent in module_root.parents:
         candidate = parent / "web_ui" / "dist"

@@ -28,6 +28,9 @@ dev = [
     "ruff>=0.8.0",
     "pyright>=1.1.0",
 ]
+packaging = [
+    "pyinstaller>=6.0.0",
+]
 
 [project.scripts]
 xmpp-p2p-service = "xmpp_p2p_chat.connection_service.__main__:main"
