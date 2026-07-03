@@ -134,16 +134,50 @@ class RpcServer:
                 contact_data["id"] = str(uuid4())
             contact = Contact.model_validate(contact_data)
             added = svc.addressbook.add(contact)
+            await self._maybe_broadcast_sync(svc, action="add", contact=added)
             return {"id": added.id, "contact": added.model_dump(mode="json")}
 
         if method == "addressbook.update":
             contact_id = params["id"]
             partial = params.get("partial", {k: v for k, v in params.items() if k != "id"})
             updated = svc.addressbook.update(contact_id, partial)
+            await self._maybe_broadcast_sync(svc, action="update", contact=updated)
             return {"contact": updated.model_dump(mode="json")}
 
         if method == "addressbook.remove":
-            svc.addressbook.remove(params["id"])
+            contact_id = params["id"]
+            svc.addressbook.remove(contact_id)
+            await self._maybe_broadcast_sync(svc, action="remove", contact_id=contact_id)
+            return {"ok": True}
+
+        if method == "addressbook.sync_status":
+            sync = svc.sessions.sync_service()
+            if not sync:
+                return {"enabled": False, "auto_apply": False, "pending_count": 0, "secret_configured": False}
+            return (await sync.status()).model_dump(mode="json")
+
+        if method == "addressbook.enable_sync":
+            return await svc.sessions.enable_addressbook_sync(
+                enabled=bool(params.get("enabled", True)),
+                auto_apply=params.get("auto_apply"),
+            )
+
+        if method == "addressbook.sync_now":
+            return await svc.sessions.sync_addressbook_now(params.get("contact_ids"))
+
+        if method == "addressbook.get_pending_updates":
+            return {"updates": await svc.sessions.get_pending_sync_updates()}
+
+        if method == "addressbook.apply_pending_update":
+            ok = await svc.sessions.apply_pending_sync_update(params["id"])
+            if not ok:
+                raise JsonRpcError(-32004, "Pending update not found")
+            return {"ok": True}
+
+        if method == "addressbook.reject_pending_update":
+            ok = await svc.sessions.reject_pending_sync_update(params["id"])
+            if not ok:
+                raise JsonRpcError(-32004, "Pending update not found")
             return {"ok": True}
 
         if method == "chat.start":
@@ -223,6 +257,22 @@ class RpcServer:
             return {"ok": True}
 
         raise JsonRpcError(-32601, f"Method not found: {method}")
+
+    async def _maybe_broadcast_sync(
+        self,
+        svc: ConnectionService,  # noqa: F821
+        *,
+        action: str,
+        contact: Contact | None = None,
+        contact_id: str | None = None,
+    ) -> None:
+        sync = svc.sessions.sync_service()
+        if not sync or not sync.config.enabled:
+            return
+        try:
+            await sync.broadcast_mutation(action=action, contact=contact, contact_id=contact_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Address book sync broadcast failed: %s", exc)
 
     async def broadcast(self, event: str, params: dict) -> None:
         if not self.clients:

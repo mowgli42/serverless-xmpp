@@ -10,7 +10,13 @@ from uuid import uuid4
 
 import aiosqlite
 
-from xmpp_p2p_chat.common.models import ChatSession, DeliveryStatus, Message, MessageDirection
+from xmpp_p2p_chat.common.models import (
+    AddressBookSyncPending,
+    ChatSession,
+    DeliveryStatus,
+    Message,
+    MessageDirection,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +57,15 @@ CREATE TABLE IF NOT EXISTS presence (
     show TEXT NOT NULL DEFAULT 'offline',
     status TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS addressbook_sync_pending (
+    id TEXT PRIMARY KEY,
+    from_jid TEXT NOT NULL,
+    action TEXT NOT NULL,
+    contact_id TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    received_at TEXT NOT NULL
 );
 """
 
@@ -220,6 +235,59 @@ class PersistenceManager:
         if not rows:
             return "offline", ""
         return rows[0]["show"], rows[0]["status"]
+
+    async def save_sync_pending(
+        self,
+        pending_id: str,
+        *,
+        from_jid: str,
+        action: str,
+        contact_id: str,
+        payload: dict,
+    ) -> None:
+        await self.db.execute(
+            """
+            INSERT INTO addressbook_sync_pending (id, from_jid, action, contact_id, payload, received_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                pending_id,
+                from_jid,
+                action,
+                contact_id,
+                json.dumps(payload),
+                datetime.now(UTC).isoformat(),
+            ),
+        )
+        await self.db.commit()
+
+    async def list_sync_pending(self) -> list[AddressBookSyncPending]:
+        rows = await self.db.execute_fetchall(
+            "SELECT * FROM addressbook_sync_pending ORDER BY received_at ASC"
+        )
+        return [self._row_to_sync_pending(row) for row in rows]
+
+    async def get_sync_pending(self, pending_id: str) -> AddressBookSyncPending | None:
+        rows = await self.db.execute_fetchall(
+            "SELECT * FROM addressbook_sync_pending WHERE id = ?", (pending_id,)
+        )
+        if not rows:
+            return None
+        return self._row_to_sync_pending(rows[0])
+
+    async def delete_sync_pending(self, pending_id: str) -> None:
+        await self.db.execute("DELETE FROM addressbook_sync_pending WHERE id = ?", (pending_id,))
+        await self.db.commit()
+
+    def _row_to_sync_pending(self, row: aiosqlite.Row) -> AddressBookSyncPending:
+        return AddressBookSyncPending(
+            id=row["id"],
+            from_jid=row["from_jid"],
+            action=row["action"],
+            contact_id=row["contact_id"],
+            payload=json.loads(row["payload"]),
+            received_at=datetime.fromisoformat(row["received_at"]),
+        )
 
     def _row_to_message(self, row: aiosqlite.Row) -> Message:
         raw = json.loads(row["raw_stanza"]) if row["raw_stanza"] else None

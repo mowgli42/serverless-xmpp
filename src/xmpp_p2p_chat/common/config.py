@@ -39,6 +39,17 @@ class XMPPConfig:
     password_ref: str = ""
     server: str = ""
     port: int = 5222
+    ping_interval_seconds: int = 90
+    ping_timeout_seconds: int = 30
+    stream_management_enabled: bool = True
+
+
+@dataclass
+class AddressBookSyncConfig:
+    enabled: bool = False
+    secret: str = ""
+    auto_apply: bool = False
+    max_timestamp_skew_seconds: int = 300
 
 
 @dataclass
@@ -76,6 +87,7 @@ class AppConfig:
     xmpp: XMPPConfig = field(default_factory=XMPPConfig)
     p2p: P2PConfig = field(default_factory=P2PConfig)
     ui: UIConfig = field(default_factory=UIConfig)
+    addressbook_sync: AddressBookSyncConfig = field(default_factory=AddressBookSyncConfig)
 
     @property
     def web_ui_url(self) -> str:
@@ -147,6 +159,21 @@ def load_config(path: Path | None = None) -> AppConfig:
             password_ref=xmpp.get("password_ref", cfg.xmpp.password_ref),
             server=xmpp.get("server", cfg.xmpp.server),
             port=int(xmpp.get("port", cfg.xmpp.port)),
+            ping_interval_seconds=int(xmpp.get("ping_interval_seconds", cfg.xmpp.ping_interval_seconds)),
+            ping_timeout_seconds=int(xmpp.get("ping_timeout_seconds", cfg.xmpp.ping_timeout_seconds)),
+            stream_management_enabled=bool(
+                xmpp.get("stream_management_enabled", cfg.xmpp.stream_management_enabled)
+            ),
+        )
+
+        sync = data.get("addressbook", {}).get("sync", data.get("addressbook_sync", {}))
+        cfg.addressbook_sync = AddressBookSyncConfig(
+            enabled=bool(sync.get("enabled", cfg.addressbook_sync.enabled)),
+            secret=sync.get("secret", cfg.addressbook_sync.secret),
+            auto_apply=bool(sync.get("auto_apply", cfg.addressbook_sync.auto_apply)),
+            max_timestamp_skew_seconds=int(
+                sync.get("max_timestamp_skew_seconds", cfg.addressbook_sync.max_timestamp_skew_seconds)
+            ),
         )
 
         p2p = data.get("p2p", {})
@@ -188,7 +215,23 @@ def save_default_config(path: Path | None = None) -> Path:
         },
         "logging": {"level": "INFO", "file": "", "json_file": "", "ebk_stderr": True},
         "security": {"enforce_tls": True, "allow_self_signed_direct": True},
-        "xmpp": {"jid": "", "password": "", "server": "", "port": 5222},
+        "xmpp": {
+            "jid": "",
+            "password": "",
+            "server": "",
+            "port": 5222,
+            "ping_interval_seconds": 90,
+            "ping_timeout_seconds": 30,
+            "stream_management_enabled": True,
+        },
+        "addressbook": {
+            "sync": {
+                "enabled": False,
+                "secret": "",
+                "auto_apply": False,
+                "max_timestamp_skew_seconds": 300,
+            }
+        },
         "p2p": {
             "local_jid": "",
             "listen_host": "0.0.0.0",

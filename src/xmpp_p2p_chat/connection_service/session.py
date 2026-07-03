@@ -22,6 +22,7 @@ from xmpp_p2p_chat.common.models import (
 )
 from xmpp_p2p_chat.common.sanitize import sanitize_message_body
 from xmpp_p2p_chat.connection_service.addressbook import AddressBookManager
+from xmpp_p2p_chat.connection_service.addressbook_sync import AddressBookSyncService
 from xmpp_p2p_chat.connection_service.discovery.mdns import DiscoveredPeer, MdnsDiscovery
 from xmpp_p2p_chat.connection_service.persistence import PersistenceManager
 from xmpp_p2p_chat.connection_service.transports.base import BaseTransport
@@ -48,10 +49,17 @@ class SessionManager:
         self._xmpp: XMPPServerTransport | None = None
         self._p2p: DirectP2PTransport | None = None
         self._mdns: MdnsDiscovery | None = None
+        self._sync: AddressBookSyncService | None = None
         self._sessions: dict[str, ChatSession] = {}
         self._jid_to_contact: dict[str, str] = {}
 
     async def initialize(self) -> None:
+        self._sync = AddressBookSyncService(
+            self.addressbook,
+            self.persistence,
+            self.config.addressbook_sync,
+            self.on_push,
+        )
         for contact in self.addressbook.contacts:
             self._jid_to_contact[contact.jid.lower()] = contact.id
 
@@ -149,13 +157,25 @@ class SessionManager:
                 server=self.config.xmpp.server or None,
                 port=self.config.xmpp.port,
                 enforce_tls=self.config.enforce_tls,
+                data_dir=self.config.data_directory,
+                stream_management_enabled=self.config.xmpp.stream_management_enabled,
+                ping_interval_seconds=self.config.xmpp.ping_interval_seconds,
+                ping_timeout_seconds=self.config.xmpp.ping_timeout_seconds,
             )
             self._xmpp.on_message(self._handle_incoming_message)
             self._xmpp.on_presence(self._handle_presence)
             self._xmpp.on_state(self._handle_transport_state)
 
+        if self._sync:
+            self._sync.set_send_iq(self._send_sync_iq)
+            self._xmpp.set_sync_handler(self._sync.handle_inbound_iq)
+
         await self._xmpp.connect()
         return self._xmpp
+
+    async def _send_sync_iq(self, to_jid: str, payload: dict) -> None:
+        xmpp = await self._ensure_xmpp()
+        await xmpp.send_sync_iq(to_jid, payload)
 
     def _register_p2p_peer(self, contact: Contact) -> None:
         if not self._p2p or not contact.direct:
@@ -362,6 +382,40 @@ class SessionManager:
         if self._needs_xmpp():
             await self._ensure_xmpp()
         await self._drain_outbox()
+
+    def sync_service(self) -> AddressBookSyncService | None:
+        return self._sync
+
+    async def enable_addressbook_sync(
+        self, *, enabled: bool, auto_apply: bool | None = None
+    ) -> dict:
+        if not self._sync:
+            raise ValueError("Sync service not initialized")
+        if enabled and not self.config.addressbook_sync.secret:
+            raise ValueError("Configure addressbook.sync.secret before enabling sync")
+        self._sync.configure(enabled=enabled, auto_apply=auto_apply)
+        return (await self._sync.status()).model_dump(mode="json")
+
+    async def sync_addressbook_now(self, contact_ids: list[str] | None = None) -> dict:
+        if not self._sync:
+            raise ValueError("Sync service not initialized")
+        return await self._sync.sync_now(contact_ids)
+
+    async def get_pending_sync_updates(self) -> list[dict]:
+        if not self._sync:
+            return []
+        rows = await self._sync.get_pending_updates()
+        return [r.model_dump(mode="json") for r in rows]
+
+    async def apply_pending_sync_update(self, pending_id: str) -> bool:
+        if not self._sync:
+            return False
+        return await self._sync.apply_pending(pending_id)
+
+    async def reject_pending_sync_update(self, pending_id: str) -> bool:
+        if not self._sync:
+            return False
+        return await self._sync.reject_pending(pending_id)
 
     async def _handle_incoming_message(
         self, from_jid: str, body: str, stanza_id: str | None

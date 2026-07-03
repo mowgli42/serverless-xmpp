@@ -54,7 +54,9 @@ Contacts come from a **local address book** (JSON files), not from a server rost
 | **RFC 7395** (WebSocket binding) | No | Local API uses WebSocket JSON-RPC, not XMPP-over-WebSocket |
 | **XEP-0174** (Serverless Messaging) | Inspired | TLS + direct streams; no full XEP-0174 negotiation or link-local discovery |
 | **XEP-0030** (Service Discovery) | Registered only | slixmpp plugin loaded; no app-level usage |
-| **XEP-0199** (XMPP Ping) | Yes (server mode) | Available via slixmpp on XMPP server transport |
+| **XEP-0198** (Stream Management) | Yes (server mode) | slixmpp `xep_0198`; persisted SM state in `.xmpp-sm-state.json`; resume on reconnect |
+| **XEP-0199** (XMPP Ping) | Yes (server mode) | Periodic keepalive (default 90s); dead connection triggers reconnect |
+| **Address book sync** | Yes (optional) | Signed updates over `urn:serverless-xmpp:addressbook:1`; trusted JIDs only |
 | **SASL** | Server mode only | slixmpp handles PLAIN (etc.) after STARTTLS |
 | **TLS** | Yes | P2P: raw TLS 1.2+ with self-signed certs + SHA256 pinning; Server: STARTTLS via slixmpp |
 | **Roster (RFC 6121)** | No | Replaced by local address book |

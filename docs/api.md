@@ -68,6 +68,23 @@ Re-reads the address book from disk (after external edits) and broadcasts `addre
 {"method":"addressbook.remove","params":{"id":"bob"}}
 ```
 
+When `[addressbook.sync] enabled = true`, mutations are signed and pushed to XMPP-server contacts.
+
+### Address book sync (XMPP server mode)
+
+Requires `[addressbook.sync] secret` shared out-of-band among trusted peers.
+
+| Method | Purpose |
+|--------|---------|
+| `addressbook.sync_status` | `{enabled, auto_apply, pending_count, secret_configured}` |
+| `addressbook.enable_sync` | `{"enabled": true, "auto_apply": false}` |
+| `addressbook.sync_now` | Push announce to XMPP contacts; optional `contact_ids` filter |
+| `addressbook.get_pending_updates` | List inbound updates awaiting review |
+| `addressbook.apply_pending_update` | `{"id": "<pending-id>"}` |
+| `addressbook.reject_pending_update` | `{"id": "<pending-id>"}` |
+
+Push event: `addressbook.sync_pending` — `{id, from_jid, action}`
+
 ### `chat.start`
 
 ```json
@@ -94,17 +111,35 @@ Re-reads the address book from disk (after external edits) and broadcasts `addre
 
 ### `connection.status`
 
-Returns transport states, local JID, and P2P fingerprint when available.
+Returns transport states, local JID, structured XMPP errors, and P2P fingerprint when available.
 
 ```json
 {
   "result": {
-    "transports": [{"transport":"direct-p2p","state":"connected","jid":"..."}],
+    "transports": [
+      {
+        "transport": "xmpp-server",
+        "state": "connected",
+        "jid": "alice@example.com",
+        "error_condition": null,
+        "error_type": null,
+        "stream_management": {"enabled": true, "sm_id_present": true}
+      }
+    ],
     "local_jid": "alice@p2p.local",
     "p2p_fingerprint": "SHA256:...",
     "p2p_listen_port": 5223
   }
 }
+```
+
+Configure XMPP resilience under `[xmpp]`:
+
+```toml
+[xmpp]
+ping_interval_seconds = 90
+ping_timeout_seconds = 30
+stream_management_enabled = true
 ```
 
 ### `connection.reconnect`

@@ -105,6 +105,33 @@ class TransportStatus(BaseModel):
     state: ConnectionState
     error: str | None = None
     jid: str | None = None
+    error_condition: str | None = None
+    error_type: str | None = None
+    stream_management: dict[str, bool | str | None] | None = None
+
+
+class XmppErrorInfo(BaseModel):
+    condition: str | None = None
+    error_type: str | None = None
+    text: str | None = None
+    raw: str | None = None
+
+
+class AddressBookSyncPending(BaseModel):
+    id: str
+    from_jid: str
+    action: str
+    contact_id: str
+    payload: dict
+    received_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    status: str = "pending"
+
+
+class AddressBookSyncStatus(BaseModel):
+    enabled: bool = False
+    auto_apply: bool = False
+    pending_count: int = 0
+    secret_configured: bool = False
 
 
 class HealthStatus(BaseModel):
