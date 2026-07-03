@@ -125,9 +125,10 @@ This project follows the [OpenSpec](https://github.com/Fission-AI/OpenSpec) work
 - [x] MVP: Text TUI + Web SPA
 - [x] Multi-client test harness (Docker Prosody + scripts)
 - [x] MVP: Direct P2P transport (TLS + XMPP streams, mutual peer connections)
-- [ ] mDNS LAN discovery (zeroconf)
+- [x] mDNS LAN discovery (zeroconf)
 - [ ] Packaging & distribution
-- [ ] Polish, E2EE, embedded web UI server
+- [x] Embedded web UI server
+- [ ] Per-chat E2EE (stretch)
 
 ## License
 

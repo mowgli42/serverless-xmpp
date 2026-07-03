@@ -152,6 +152,27 @@ class RpcServer:
             await svc.sessions.reconnect()
             return {"ok": True}
 
+        if method == "discovery.list":
+            peers = svc.sessions.discovered_peers()
+            return {
+                "peers": [
+                    {
+                        "jid": p.jid,
+                        "host": p.host,
+                        "port": p.port,
+                        "fingerprint": p.fingerprint,
+                        "service_name": p.service_name,
+                    }
+                    for p in peers
+                ]
+            }
+
+        if method == "discovery.apply":
+            contact = svc.sessions.apply_discovered_endpoint(params["contact_id"])
+            if not contact:
+                raise JsonRpcError(-32004, "No matching discovered peer for contact")
+            return {"contact": contact.model_dump(mode="json")}
+
         if method == "system.health":
             uptime = (datetime.now(UTC) - self._started_at).total_seconds()
             health = HealthStatus(

@@ -240,4 +240,20 @@ Shared `pyproject.toml` with optional deps for `textual`, `websockets`, `slixmpp
 
 These will be clarified in tasks or early spikes.
 
+## Implementation Notes (Post-MVP, July 2026)
+
+Deviations and lessons from the first working implementation:
+
+| Area | Design intent | As implemented |
+|------|---------------|----------------|
+| Default transport | XMPP server for MVP | **Direct P2P** is default; XMPP server remains fallback |
+| mDNS | Optional LAN bonus | **`zeroconf`** advertiser/browser on `_xmpp-p2p._tcp.local.`; `discovery.list` / `discovery.apply` API |
+| Web UI hosting | Optional embedded server | **`WebUIServer`** serves `web_ui/dist` at `127.0.0.1:8767` when `[ui] serve_web = true` |
+| Credentials | OS keyring preferred | **`resolve_password()`** supports `password_ref` in config and per-contact credentials |
+| P2P TLS | Strict fingerprint pinning | Outbound verifies fingerprint; inbound relaxed when peer cert unavailable (documented in `docs/p2p-serverless.md`) |
+| API docs | TBD | **`docs/api.md`** documents all RPC methods and push events |
+| Phase 7 validation | Manual E2E | **27 pytest tests** including restart history, dual-client sync, outbox drain |
+
+Remaining manual validation: full TUI + Web UI chat over real XMPP account; long-running soak test; PyInstaller packaging.
+
 This design keeps the core simple and testable while providing clear extension points for P2P and advanced features. It is optimized for rapid, high-quality implementation with AI assistance (Cursor) following the accompanying spec and tasks.

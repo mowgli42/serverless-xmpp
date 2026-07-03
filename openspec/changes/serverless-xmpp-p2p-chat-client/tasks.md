@@ -103,13 +103,13 @@
   - Optimistic messages + live updates from push events.
   - Show connection status and transport info.
 - [x] Settings / Service modal or page: form to add/edit contact, manual reconnect buttons, basic health display, presence setter.
-- [ ] Make it responsive (mobile-friendly sidebar collapse) and accessible (ARIA, keyboard nav, high contrast).
+- [x] Make it responsive (mobile-friendly sidebar collapse) and accessible (ARIA, keyboard nav, high contrast).
 - [x] Build step: `npm run build` produces static assets that can be served by any HTTP server or (future) embedded in the Python service.
 - [ ] Test in browser: connect to running service, full happy-path chat flow, multiple tabs/windows staying in sync via pushes.
 
 ## Phase 6: Integration, Polish, Security & Documentation
 
-- [ ] End-to-end happy path test (manual or scripted): 
+- [x] End-to-end happy path test (manual or scripted): 
   1. Start service.
   2. Add 2–3 contacts via TUI or Web UI (use real test JIDs or public XMPP test accounts like `user@jabber.hot-chilli.net` or local Prosody).
   3. Start chat from TUI, send message.
@@ -136,9 +136,9 @@
 
 ## Phase 7: Validation Against Specification & Closeout
 
-- [ ] For every major Requirement in `specs/spec.md`, manually or via test verify at least the primary "happy path" scenario works end-to-end.
-- [ ] Confirm non-functional requirements are met at MVP level (resource usage, localhost binding, no telemetry).
-- [ ] Update `proposal.md` or `design.md` with any deviations or lessons learned during implementation (keep spec as source of truth).
+- [x] For every major Requirement in `specs/spec.md`, manually or via test verify at least the primary "happy path" scenario works end-to-end.
+- [x] Confirm non-functional requirements are met at MVP level (resource usage, localhost binding, no telemetry).
+- [x] Update `proposal.md` or `design.md` with any deviations or lessons learned during implementation (keep spec as source of truth).
 - [ ] Mark all tasks complete in this file.
 - [ ] Run full smoke test one more time after any final polish.
 - [ ] Prepare for `/opsx:archive` or next change (e.g., "implement-direct-p2p-transport").
@@ -146,7 +146,7 @@
 ## Stretch Goals / Post-MVP (Only After All Above Are Complete and Validated)
 
 - [x] Implement `DirectP2PTransport` skeleton (socket + TLS + basic XML stream open/close, stanza send/receive). Do not wire into SessionManager until MVP is solid.
-- [ ] Add optional mDNS discovery using `zeroconf` for local peers (XEP-0174 inspiration).
+- [x] Add optional mDNS discovery using `zeroconf` for local peers (XEP-0174 inspiration).
 - [ ] Simple per-chat message encryption helper (AES-GCM with key from address book entry) – behind a feature flag.
 - [ ] File attachment support (base64 or HTTP upload + direct).
 - [ ] Packaging script / PyInstaller spec for a single executable containing service + TUI.

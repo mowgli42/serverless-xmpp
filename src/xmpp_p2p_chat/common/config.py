@@ -36,6 +36,7 @@ def default_data_dir() -> Path:
 class XMPPConfig:
     jid: str = ""
     password: str = ""
+    password_ref: str = ""
     server: str = ""
     port: int = 5222
 
@@ -45,6 +46,8 @@ class P2PConfig:
     local_jid: str = ""
     listen_host: str = "0.0.0.0"
     listen_port: int = 5223
+    mdns_enabled: bool = True
+    mdns_service_type: str = "_xmpp-p2p._tcp.local."
 
 
 @dataclass
@@ -130,6 +133,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         cfg.xmpp = XMPPConfig(
             jid=xmpp.get("jid", cfg.xmpp.jid),
             password=xmpp.get("password", cfg.xmpp.password),
+            password_ref=xmpp.get("password_ref", cfg.xmpp.password_ref),
             server=xmpp.get("server", cfg.xmpp.server),
             port=int(xmpp.get("port", cfg.xmpp.port)),
         )
@@ -139,6 +143,8 @@ def load_config(path: Path | None = None) -> AppConfig:
             local_jid=p2p.get("local_jid", cfg.p2p.local_jid),
             listen_host=p2p.get("listen_host", cfg.p2p.listen_host),
             listen_port=int(p2p.get("listen_port", cfg.p2p.listen_port)),
+            mdns_enabled=bool(p2p.get("mdns_enabled", cfg.p2p.mdns_enabled)),
+            mdns_service_type=p2p.get("mdns_service_type", cfg.p2p.mdns_service_type),
         )
 
         ui = data.get("ui", {})
@@ -168,7 +174,13 @@ def save_default_config(path: Path | None = None) -> Path:
         "logging": {"level": "INFO", "file": ""},
         "security": {"enforce_tls": True, "allow_self_signed_direct": True},
         "xmpp": {"jid": "", "password": "", "server": "", "port": 5222},
-        "p2p": {"local_jid": "", "listen_host": "0.0.0.0", "listen_port": 5223},
+        "p2p": {
+            "local_jid": "",
+            "listen_host": "0.0.0.0",
+            "listen_port": 5223,
+            "mdns_enabled": True,
+            "mdns_service_type": "_xmpp-p2p._tcp.local.",
+        },
         "ui": {"serve_web": True, "web_host": "127.0.0.1", "web_port": 8767, "web_root": ""},
     }
     with config_path.open("wb") as fh:

@@ -12,8 +12,10 @@
   let status = $state('connecting');
   let health = $state(null);
   let connectionInfo = $state(null);
+  let discoveredPeers = $state([]);
   let contactSearch = $state('');
   let showSettings = $state(false);
+  let sidebarOpen = $state(true);
   let newContact = $state({ id: '', jid: '', name: '', preferred_transport: 'direct-p2p', direct: { host: '127.0.0.1', port: 5224, public_key_fingerprint: '' } });
 
   let filteredContacts = $derived(
@@ -28,7 +30,11 @@
     api.onEvent(handleEvent);
     api.connect();
     loadContacts();
-    const interval = setInterval(refreshStatus, 5000);
+    refreshDiscovery();
+    const interval = setInterval(() => {
+      refreshStatus();
+      refreshDiscovery();
+    }, 5000);
     return () => {
       clearInterval(interval);
       api.disconnect();
@@ -57,9 +63,21 @@
     }
   }
 
+  async function refreshDiscovery() {
+    try {
+      const result = await api.call('discovery.list');
+      discoveredPeers = result.peers || [];
+    } catch {
+      discoveredPeers = [];
+    }
+  }
+
   async function selectContact(contact) {
     selectedId = contact.id;
     selectedName = contact.name;
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      sidebarOpen = false;
+    }
     await api.call('chat.start', { contact_id: contact.id });
     const result = await api.call('chat.get_history', { chat_id: contact.id, limit: 100 });
     messages = result.messages || [];
@@ -81,7 +99,14 @@
   async function addContact() {
     if (!newContact.id || !newContact.jid || !newContact.name) return;
     await api.call('addressbook.add', { contact: newContact });
-    newContact = { id: '', jid: '', name: '' };
+    newContact = { id: '', jid: '', name: '', preferred_transport: 'direct-p2p', direct: { host: '127.0.0.1', port: 5224, public_key_fingerprint: '' } };
+    await loadContacts();
+  }
+
+  async function applyDiscovery(peer) {
+    const match = contacts.find((c) => c.jid === peer.jid);
+    if (!match) return;
+    await api.call('discovery.apply', { contact_id: match.id });
     await loadContacts();
   }
 
@@ -103,6 +128,9 @@
     if (event === 'addressbook.updated') {
       loadContacts();
     }
+    if (event === 'discovery.updated') {
+      discoveredPeers = params.peers || [];
+    }
     if (event === 'connection.changed') {
       status = params.state;
     }
@@ -117,26 +145,52 @@
     const show = presence[id]?.show || 'offline';
     return show === 'available' ? 'bg-emerald-400' : show === 'away' ? 'bg-amber-400' : 'bg-slate-500';
   }
+
+  function handleComposerKeydown(e) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
 </script>
 
-<div class="flex h-screen">
-  <aside class="w-72 border-r border-slate-800 flex flex-col bg-slate-900">
+<div class="flex h-screen relative">
+  {#if sidebarOpen}
+    <button
+      class="md:hidden fixed inset-0 bg-black/50 z-10"
+      aria-label="Close contacts sidebar"
+      onclick={() => (sidebarOpen = false)}
+    ></button>
+  {/if}
+
+  <aside
+    class="w-72 border-r border-slate-800 flex flex-col bg-slate-900 shrink-0
+      fixed md:relative inset-y-0 left-0 z-20 transform transition-transform duration-200
+      {sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}"
+    aria-label="Contacts sidebar"
+  >
     <header class="p-4 border-b border-slate-800">
       <h1 class="text-lg font-semibold">Serverless XMPP</h1>
       <p class="text-xs text-emerald-500/80">Local service mode</p>
       <p class="text-xs text-slate-400 truncate" title={status}>{status}</p>
     </header>
     <div class="p-3">
-      <input class="w-full rounded bg-slate-800 px-3 py-2 text-sm" placeholder="Search contacts..." bind:value={contactSearch} aria-label="Search contacts" />
+      <input
+        class="w-full rounded bg-slate-800 px-3 py-2 text-sm"
+        placeholder="Search contacts..."
+        bind:value={contactSearch}
+        aria-label="Search contacts"
+      />
     </div>
-    <ul class="flex-1 overflow-y-auto">
+    <ul class="flex-1 overflow-y-auto" role="list">
       {#each filteredContacts as contact (contact.id)}
         <li>
           <button
             class="w-full text-left px-4 py-3 hover:bg-slate-800 flex items-center gap-3 {selectedId === contact.id ? 'bg-slate-800' : ''}"
             onclick={() => selectContact(contact)}
+            aria-current={selectedId === contact.id ? 'true' : undefined}
           >
-            <span class="w-2 h-2 rounded-full {presenceColor(contact.id)}"></span>
+            <span class="w-2 h-2 rounded-full {presenceColor(contact.id)}" aria-hidden="true"></span>
             <div>
               <div class="font-medium">{contact.name}</div>
               <div class="text-xs text-slate-400">{contact.jid}</div>
@@ -152,12 +206,23 @@
     </div>
   </aside>
 
-  <main class="flex-1 flex flex-col">
+  <main class="flex-1 flex flex-col min-w-0">
+    <header class="p-4 border-b border-slate-800 flex items-center gap-3">
+      <button
+        class="md:hidden rounded bg-slate-800 px-3 py-2 text-sm"
+        onclick={() => (sidebarOpen = !sidebarOpen)}
+        aria-expanded={sidebarOpen}
+        aria-controls="contacts-sidebar"
+      >
+        Contacts
+      </button>
+      {#if selectedId}
+        <h2 class="text-xl font-semibold truncate">{selectedName}</h2>
+      {/if}
+    </header>
+
     {#if selectedId}
-      <header class="p-4 border-b border-slate-800">
-        <h2 class="text-xl font-semibold">{selectedName}</h2>
-      </header>
-      <div class="flex-1 overflow-y-auto p-4 space-y-3">
+      <div class="flex-1 overflow-y-auto p-4 space-y-3" role="log" aria-live="polite" aria-label="Chat messages">
         {#each messages as msg (msg.id || msg.timestamp + msg.body)}
           <div class="flex flex-col {msg.direction === 'out' ? 'items-end' : 'items-start'}">
             <div class={msg.direction === 'out' ? 'bubble-out' : 'bubble-in'}>{msg.body}</div>
@@ -170,25 +235,31 @@
         {/each}
       </div>
       <form class="p-4 border-t border-slate-800 flex gap-2" onsubmit={(e) => { e.preventDefault(); sendMessage(); }}>
-        <input
-          class="flex-1 rounded-lg bg-slate-800 px-4 py-3"
+        <textarea
+          class="flex-1 rounded-lg bg-slate-800 px-4 py-3 resize-none min-h-[3rem]"
           bind:value={draft}
-          placeholder="Type a message..."
-        />
-        <button class="rounded-lg bg-emerald-600 px-5 py-3 font-medium hover:bg-emerald-500" type="submit">
+          placeholder="Type a message... (Ctrl+Enter to send)"
+          aria-label="Message composer"
+          onkeydown={handleComposerKeydown}
+        ></textarea>
+        <button class="rounded-lg bg-emerald-600 px-5 py-3 font-medium hover:bg-emerald-500 self-end" type="submit">
           Send
         </button>
       </form>
     {:else}
-      <div class="flex-1 grid place-items-center text-slate-400">
+      <div class="flex-1 grid place-items-center text-slate-400 p-4 text-center">
         Select a contact to start chatting
       </div>
     {/if}
   </main>
 
   {#if showSettings}
-    <aside class="w-80 border-l border-slate-800 bg-slate-900 p-4 space-y-4 overflow-y-auto">
-      <h3 class="font-semibold">Service</h3>
+    <aside class="w-full sm:w-80 border-l border-slate-800 bg-slate-900 p-4 space-y-4 overflow-y-auto fixed sm:relative inset-y-0 right-0 z-30" aria-label="Settings panel">
+      <div class="flex justify-between items-center sm:hidden">
+        <h3 class="font-semibold">Settings</h3>
+        <button class="text-sm text-slate-400" onclick={() => (showSettings = false)}>Close</button>
+      </div>
+      <h3 class="font-semibold hidden sm:block">Service</h3>
       {#if connectionInfo?.transports?.length}
         <ul class="text-sm text-slate-400 space-y-1">
           {#each connectionInfo.transports as t}
@@ -200,6 +271,19 @@
         <p class="text-xs text-slate-500 break-all">P2P fingerprint: {connectionInfo.p2p_fingerprint}</p>
         <p class="text-xs text-slate-500">Listen port: {connectionInfo.p2p_listen_port}</p>
       {/if}
+      {#if discoveredPeers.length}
+        <div class="pt-2">
+          <h4 class="text-sm font-medium text-slate-300">LAN peers (mDNS)</h4>
+          <ul class="text-xs text-slate-400 space-y-2 mt-2">
+            {#each discoveredPeers as peer}
+              <li class="flex flex-col gap-1">
+                <span>{peer.jid} — {peer.host}:{peer.port}</span>
+                <button class="text-emerald-400 text-left" onclick={() => applyDiscovery(peer)}>Apply to contact</button>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
       {#if health}
         <div class="text-sm text-slate-400 space-y-1 pt-2">
           <p>Uptime: {Math.round(health.uptime_seconds)}s</p>
@@ -210,9 +294,9 @@
       <button class="rounded bg-slate-800 px-3 py-2 text-sm" onclick={reconnect}>Reconnect transports</button>
 
       <h3 class="font-semibold pt-4">Add contact</h3>
-      <input class="w-full rounded bg-slate-800 px-3 py-2 text-sm mb-2" placeholder="id" bind:value={newContact.id} />
-      <input class="w-full rounded bg-slate-800 px-3 py-2 text-sm mb-2" placeholder="jid" bind:value={newContact.jid} />
-      <input class="w-full rounded bg-slate-800 px-3 py-2 text-sm mb-2" placeholder="name" bind:value={newContact.name} />
+      <input class="w-full rounded bg-slate-800 px-3 py-2 text-sm mb-2" placeholder="id" bind:value={newContact.id} aria-label="Contact id" />
+      <input class="w-full rounded bg-slate-800 px-3 py-2 text-sm mb-2" placeholder="jid" bind:value={newContact.jid} aria-label="Contact JID" />
+      <input class="w-full rounded bg-slate-800 px-3 py-2 text-sm mb-2" placeholder="name" bind:value={newContact.name} aria-label="Contact name" />
       <button class="rounded bg-emerald-700 px-3 py-2 text-sm" onclick={addContact}>Add</button>
     </aside>
   {/if}

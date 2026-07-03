@@ -8,17 +8,21 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from xmpp_p2p_chat.common.config import AppConfig
+from xmpp_p2p_chat.common.credentials import resolve_password
 from xmpp_p2p_chat.common.models import (
     ChatSession,
     ConnectionState,
     Contact,
+    ContactCredentials,
     DeliveryStatus,
+    DirectEndpoint,
     Message,
     MessageDirection,
     TransportStatus,
 )
 from xmpp_p2p_chat.common.sanitize import sanitize_message_body
 from xmpp_p2p_chat.connection_service.addressbook import AddressBookManager
+from xmpp_p2p_chat.connection_service.discovery.mdns import DiscoveredPeer, MdnsDiscovery
 from xmpp_p2p_chat.connection_service.persistence import PersistenceManager
 from xmpp_p2p_chat.connection_service.transports.base import BaseTransport
 from xmpp_p2p_chat.connection_service.transports.direct_p2p import DirectP2PTransport, PeerEndpoint
@@ -43,6 +47,7 @@ class SessionManager:
         self.on_push = on_push
         self._xmpp: XMPPServerTransport | None = None
         self._p2p: DirectP2PTransport | None = None
+        self._mdns: MdnsDiscovery | None = None
         self._sessions: dict[str, ChatSession] = {}
         self._jid_to_contact: dict[str, str] = {}
 
@@ -67,11 +72,24 @@ class SessionManager:
         )
 
     def _needs_xmpp(self) -> bool:
-        if not (self.config.xmpp.jid and self.config.xmpp.password):
+        if not self.config.xmpp.jid:
+            return False
+        if not self._resolve_xmpp_password():
             return False
         if self.config.default_transport == "xmpp-server":
             return True
         return any(c.preferred_transport == "xmpp-server" for c in self.addressbook.contacts)
+
+    def _resolve_xmpp_password(self, contact: Contact | None = None) -> str | None:
+        if contact and contact.credentials:
+            secret = resolve_password(contact.credentials)
+            if secret:
+                return secret
+        creds = ContactCredentials(
+            password=self.config.xmpp.password or None,
+            password_ref=self.config.xmpp.password_ref or None,
+        )
+        return resolve_password(creds)
 
     async def _ensure_p2p(self) -> DirectP2PTransport:
         if not self._p2p:
@@ -90,16 +108,44 @@ class SessionManager:
 
         if not self._p2p._server:  # noqa: SLF001 - startup guard
             await self._p2p.connect()
+        await self._ensure_mdns()
         return self._p2p
+
+    async def _ensure_mdns(self) -> None:
+        if not self.config.p2p.mdns_enabled or not self._p2p:
+            return
+        if self._mdns:
+            return
+        fingerprint = self._p2p.fingerprint
+        if not fingerprint:
+            return
+
+        def on_discovery_updated() -> None:
+            self.on_push(
+                "discovery.updated",
+                {"peers": [p.__dict__ for p in self._mdns.peers] if self._mdns else []},
+            )
+
+        self._mdns = MdnsDiscovery(
+            local_jid=self.config.effective_local_jid,
+            listen_port=self.config.p2p.listen_port,
+            fingerprint=fingerprint,
+            service_type=self.config.p2p.mdns_service_type,
+            on_updated=on_discovery_updated,
+        )
+        self._mdns.start()
 
     async def _ensure_xmpp(self) -> XMPPServerTransport:
         if self._xmpp and self._xmpp.status().state == ConnectionState.CONNECTED:
             return self._xmpp
 
         if not self._xmpp:
+            password = self._resolve_xmpp_password()
+            if not password:
+                raise ValueError("XMPP password not configured (set password or password_ref in config)")
             self._xmpp = XMPPServerTransport(
                 jid=self.config.xmpp.jid,
-                password=self.config.xmpp.password,
+                password=password,
                 server=self.config.xmpp.server or None,
                 port=self.config.xmpp.port,
                 enforce_tls=self.config.enforce_tls,
@@ -273,6 +319,34 @@ class SessionManager:
     def p2p_fingerprint(self) -> str | None:
         return self._p2p.fingerprint if self._p2p else None
 
+    def discovered_peers(self) -> list[DiscoveredPeer]:
+        return self._mdns.peers if self._mdns else []
+
+    def apply_discovered_endpoint(self, contact_id: str) -> Contact | None:
+        """Fill direct endpoint from mDNS if contact JID matches a discovered peer."""
+        contact = self.addressbook.get(contact_id)
+        if not contact or not self._mdns:
+            return None
+        for peer in self._mdns.peers:
+            if peer.jid.lower() != contact.jid.lower():
+                continue
+            if contact.direct and contact.direct.host not in ("", "127.0.0.1", "0.0.0.0"):
+                return contact
+            updated = self.addressbook.update(
+                contact_id,
+                {
+                    "direct": DirectEndpoint(
+                        host=peer.host,
+                        port=peer.port,
+                        public_key_fingerprint=peer.fingerprint,
+                    ).model_dump(mode="json"),
+                    "preferred_transport": "direct-p2p",
+                },
+            )
+            self._register_p2p_peer(updated)
+            return updated
+        return None
+
     async def reconnect(self) -> None:
         if self._xmpp:
             await self._xmpp.disconnect()
@@ -280,6 +354,9 @@ class SessionManager:
         if self._p2p:
             await self._p2p.disconnect()
             self._p2p = None
+        if self._mdns:
+            self._mdns.stop()
+            self._mdns = None
         if self._needs_p2p():
             await self._ensure_p2p()
         if self._needs_xmpp():
@@ -365,5 +442,8 @@ class SessionManager:
     async def shutdown(self) -> None:
         if self._p2p:
             await self._p2p.disconnect()
+        if self._mdns:
+            self._mdns.stop()
+            self._mdns = None
         if self._xmpp:
             await self._xmpp.disconnect()

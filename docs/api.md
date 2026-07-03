@@ -86,6 +86,34 @@ Returns transport states and P2P fingerprint when available.
 
 Force transport reconnect.
 
+### `discovery.list`
+
+List peers discovered on the local network via mDNS (when `[p2p] mdns_enabled = true`).
+
+```json
+{
+  "result": {
+    "peers": [
+      {
+        "jid": "bob@p2p.local",
+        "host": "192.168.1.50",
+        "port": 5224,
+        "fingerprint": "SHA256:...",
+        "service_name": "bob-p2p-local._xmpp-p2p._tcp.local."
+      }
+    ]
+  }
+}
+```
+
+### `discovery.apply`
+
+Apply a discovered peer's host/port/fingerprint to an existing address book contact (matched by JID).
+
+```json
+{"method":"discovery.apply","params":{"contact_id":"bob"}}
+```
+
 ### `system.health`
 
 ```json
@@ -116,6 +144,7 @@ No `id` field — these are notifications:
 | `presence.updated` | `{contact_id, show, status}` |
 | `addressbook.updated` | `{contacts: N}` |
 | `connection.changed` | transport status object |
+| `discovery.updated` | `{peers: [...]}` |
 
 ## Web UI
 

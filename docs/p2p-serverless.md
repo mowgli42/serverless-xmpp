@@ -55,6 +55,8 @@ default_transport = "direct-p2p"
 local_jid = "alice@p2p.local"   # Your identity for P2P streams
 listen_host = "0.0.0.0"         # Bind for inbound peers
 listen_port = 5223              # Your listening port
+mdns_enabled = true             # Advertise and browse on LAN (zeroconf)
+mdns_service_type = "_xmpp-p2p._tcp.local."
 
 [security]
 allow_self_signed_direct = true # Required for self-signed P2P certs
@@ -75,6 +77,18 @@ allow_self_signed_direct = true # Required for self-signed P2P certs
   }
 }
 ```
+
+## mDNS LAN Discovery
+
+When `mdns_enabled = true` (default), each running Connection Service:
+
+1. **Advertises** itself as `_xmpp-p2p._tcp.local.` with TXT records `jid`, `fp` (fingerprint), and `transport`.
+2. **Browses** for other peers on the same LAN.
+3. Exposes discovered peers via `discovery.list` and pushes `discovery.updated` to connected UIs.
+
+Use `discovery.apply` with a matching contact id to fill in `direct.host`, `direct.port`, and fingerprint from a discovered peer — useful when you know someone's JID but not their current IP.
+
+Fingerprints should still be verified out-of-band before trusting a peer.
 
 ## API: Check P2P Status
 
