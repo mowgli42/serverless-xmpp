@@ -21,3 +21,5 @@ web_ui/.svelte-kit/
 addressbook.json.bak
 addressbook.json.bad
 .test-data/
+.screenshot-data/
+.gstack/

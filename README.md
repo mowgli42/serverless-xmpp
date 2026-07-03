@@ -18,6 +18,14 @@ Uses pre-placed local address books to start peer-to-peer style chats (server-me
 - **Privacy & Security** — Local data only, TLS enforced, localhost-only API, no telemetry.
 - **Extensible** — Pluggable transports; easy to add direct P2P, E2EE, new UIs.
 
+## Screenshots
+
+| Text TUI (Textual) | Web SPA (Svelte) |
+|---|---|
+| ![Text TUI](docs/screenshots/text-ui.png) | ![Web UI](docs/screenshots/web-ui.png) |
+
+Regenerate with `./scripts/capture-screenshots.sh` (requires a running Connection Service and `playwright` + `cairosvg`).
+
 ## Quick Start
 
 ```bash

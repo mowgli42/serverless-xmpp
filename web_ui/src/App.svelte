@@ -29,8 +29,7 @@
   onMount(() => {
     api.onEvent(handleEvent);
     api.connect();
-    loadContacts();
-    refreshDiscovery();
+    waitForService().then(loadContacts);
     const interval = setInterval(() => {
       refreshStatus();
       refreshDiscovery();
@@ -40,6 +39,14 @@
       api.disconnect();
     };
   });
+
+  async function waitForService() {
+    for (let i = 0; i < 30; i++) {
+      if (api.connected) return;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    throw new Error('Service connection timeout');
+  }
 
   async function loadContacts() {
     try {
