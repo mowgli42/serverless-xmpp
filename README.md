@@ -27,25 +27,32 @@ Uses pre-placed local address books to start peer-to-peer chats over **direct TL
 
 Regenerate with `./scripts/capture-screenshots.sh` (requires a running Connection Service and `playwright` + `cairosvg`). Intermediate `.svg` files are gitignored.
 
-### Text TUI keyboard shortcuts
+## Architecture
 
-| Key | Action |
-|-----|--------|
-| `a` | Open **Address Book** — list contacts, version, hash grid, file path |
-| `n` | **New contact** (from main screen or address book) |
-| `s` | Toggle contact sort (**presence status** ↔ **name**) |
-| `Delete` | Remove selected contact (address book screen) |
-| `r` | Refresh contacts / reload address book from disk |
-| `Enter` | Open chat with selected contact |
-| `c` | Focus contact list |
-| `/` | Focus message input |
-| `?` | Help overlay |
-| `q` | Quit TUI (service keeps running) |
+![System architecture](docs/diagrams/architecture.png)
 
-The sidebar shows **who you are** (matched from the address book via `local_jid`), contact count, address book **version** (`v{N}`), and:
+UIs talk to a local **Connection Service** over WebSocket JSON-RPC. The service owns the address book, SQLite persistence, and pluggable transports (direct P2P TLS by default, optional XMPP server). PlantUML source and deeper notes: [docs/architecture.md](docs/architecture.md).
 
-- **Awaiting connection** — full **8×8 color hash grid** to verify the distributed contact list before peers connect
-- **Connected** — compact hash prefix only; contacts sorted by presence (online first) with search and alphabetical sort toggle
+## Sequence: Client Connection
+
+![Client connection sequence](docs/diagrams/client-connection.png)
+
+Primary flow: a UI connects to the Connection Service, loads contacts, and exchanges chat messages. Startup and shutdown sequences live in [docs/architecture.md](docs/architecture.md) with the PlantUML sources under [docs/diagrams/](docs/diagrams/).
+
+## Remaining / Planned Capabilities
+
+- [x] OpenSpec requirements & design
+- [x] MVP: Connection Service + Address Book + Persistence + XMPP transport
+- [x] MVP: WebSocket JSON-RPC API
+- [x] MVP: Text TUI + Web SPA
+- [x] Multi-client test harness (Docker Prosody + scripts)
+- [x] MVP: Direct P2P transport (TLS + XMPP streams, mutual peer connections)
+- [x] mDNS LAN discovery (zeroconf)
+- [x] TUI address book screen (create, view, remove, hash grid)
+- [x] Address book packaging — bundled import, version/hash, visual fingerprint
+- [x] PyInstaller packaging & distribution ([docs/packaging.md](docs/packaging.md))
+- [x] Embedded web UI server
+- [ ] Per-chat E2EE (stretch)
 
 ## Quick Start
 
@@ -77,6 +84,26 @@ For **XMPP server mode** (Prosody/ejabberd), set `[xmpp] jid`, `password`, and `
 
 Full details: [docs/quick-start.md](docs/quick-start.md) · **P2P setup**: [docs/p2p-serverless.md](docs/p2p-serverless.md) · **Address book sync**: [docs/addressbook-sync.md](docs/addressbook-sync.md) · **Architecture**: [docs/architecture.md](docs/architecture.md)
 
+### Text TUI keyboard shortcuts
+
+| Key | Action |
+|-----|--------|
+| `a` | Open **Address Book** — list contacts, version, hash grid, file path |
+| `n` | **New contact** (from main screen or address book) |
+| `s` | Toggle contact sort (**presence status** ↔ **name**) |
+| `Delete` | Remove selected contact (address book screen) |
+| `r` | Refresh contacts / reload address book from disk |
+| `Enter` | Open chat with selected contact |
+| `c` | Focus contact list |
+| `/` | Focus message input |
+| `?` | Help overlay |
+| `q` | Quit TUI (service keeps running) |
+
+The sidebar shows **who you are** (matched from the address book via `local_jid`), contact count, address book **version** (`v{N}`), and:
+
+- **Awaiting connection** — full **8×8 color hash grid** to verify the distributed contact list before peers connect
+- **Connected** — compact hash prefix only; contacts sorted by presence (online first) with search and alphabetical sort toggle
+
 ## Serverless P2P (No XMPP Server)
 
 The default transport is **direct peer-to-peer** — each client listens for inbound TLS connections and connects outbound to contacts listed in the address book:
@@ -104,22 +131,6 @@ Test two users (alice ↔ bob) with a local Prosody server:
 ```
 
 See [docs/multi-client-testing.md](docs/multi-client-testing.md).
-
-## Architecture Overview
-
-```
-UIs (Text TUI / Web SPA)
-        ↓ WebSocket + JSON-RPC (localhost)
-Connection Service (Python)
-  ├─ Address Book (JSON + version/hash)
-  ├─ SQLite persistence
-  └─ Pluggable transports
-        ↓                    ↓
-Direct P2P peers      External XMPP server
-(TLS + XML streams)   (slixmpp client)
-```
-
-Diagrams and sequence charts: [docs/architecture.md](docs/architecture.md)
 
 ## Project Structure
 
@@ -156,21 +167,6 @@ This project follows the [OpenSpec](https://github.com/Fission-AI/OpenSpec) work
 - **Web UI**: Vite + Svelte 5 + Tailwind CSS
 - **API**: WebSocket + JSON-RPC 2.0 (localhost only)
 - **Persistence**: SQLite + JSON/TOML
-
-## Status & Roadmap
-
-- [x] OpenSpec requirements & design
-- [x] MVP: Connection Service + Address Book + Persistence + XMPP transport
-- [x] MVP: WebSocket JSON-RPC API
-- [x] MVP: Text TUI + Web SPA
-- [x] Multi-client test harness (Docker Prosody + scripts)
-- [x] MVP: Direct P2P transport (TLS + XMPP streams, mutual peer connections)
-- [x] mDNS LAN discovery (zeroconf)
-- [x] TUI address book screen (create, view, remove, hash grid)
-- [x] Address book packaging — bundled import, version/hash, visual fingerprint
-- [x] PyInstaller packaging & distribution ([docs/packaging.md](docs/packaging.md))
-- [x] Embedded web UI server
-- [ ] Per-chat E2EE (stretch)
 
 ## License
 
