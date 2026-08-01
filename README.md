@@ -131,6 +131,7 @@ serverless-xmpp/
 │   ├── share/                # Bundled default addressbook.json
 │   └── common/               # Config, models, hash helpers, API client
 ├── web_ui/                   # Svelte 5 SPA (HashGrid, settings)
+├── features/                 # Gherkin happy-path scenarios (OpenSpec-aligned)
 ├── tests/                    # pytest unit + API integration tests
 ├── docs/diagrams/            # Architecture PlantUML sources + PNGs
 ├── docker/                   # Prosody for local testing
@@ -148,7 +149,7 @@ cd web_ui && npm test
 ruff check src tests
 ```
 
-This project follows the [OpenSpec](https://github.com/Fission-AI/OpenSpec) workflow. See `AGENTS.md` and `openspec/changes/serverless-xmpp-p2p-chat-client/tasks.md`.
+This project follows the [OpenSpec](https://github.com/Fission-AI/OpenSpec) workflow. See `AGENTS.md` and `openspec/changes/serverless-xmpp-p2p-chat-client/tasks.md`. Behavior-focused Gherkin for core happy paths lives in `features/` (address book + hash, direct P2P, chat messaging, UI smoke) and maps to those OpenSpec scenarios and the pytest coverage under `tests/`.
 
 ### Tech Stack
 
