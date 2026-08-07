@@ -1,0 +1,92 @@
+/* TacticalGreen — Olive / drab classic military terminal aesthetic
+   Green-on-dark for positive/secure feel and long-term readability.
+*/
+
+:root {
+  --bg: #0A0F0A;
+  --surface: #121A12;
+  --text: #D4E0D0;
+  --text-secondary: #7A9470;
+  --accent: #6B9A3E;          /* olive green */
+  --accent-bright: #8BC34A;
+  --border: #1C2A1C;
+  --incoming-bg: #121A12;
+  --outgoing-bg: #152015;
+  --radius: 3px;
+  --pad: 7px 11px;
+  --font: "SF Mono", "Consolas", "Liberation Mono", Menlo, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body, #Chat {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12.5px;
+  line-height: 1.4;
+  padding: 8px 10px;
+}
+
+.chatItem {
+  margin-bottom: 4px;
+  max-width: 94%;
+}
+
+.chatItem.followUp {
+  margin-top: 0;
+  margin-bottom: 3px;
+}
+
+.incomingItem { margin-right: auto; }
+.outgoingItem { margin-left: auto; }
+
+.msgRow {
+  background: var(--incoming-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad);
+}
+
+.outgoingItem .msgRow {
+  background: var(--outgoing-bg);
+  border-color: #243024;
+}
+
+.msgMeta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+  font-size: 11px;
+}
+
+.sender {
+  color: var(--accent-bright);
+  font-weight: 600;
+}
+
+.outgoingItem .sender {
+  color: #A5D66A;
+}
+
+.timeStamp {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.message {
+  color: var(--text);
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.followUp .msgMeta { display: none; }
+.followUp .msgRow {
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding-top: 1px;
+}
+
+.incomingItem .msgRow {
+  border-left: 3px solid var(--accent);
+}

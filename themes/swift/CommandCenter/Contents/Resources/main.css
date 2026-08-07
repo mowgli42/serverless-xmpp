@@ -1,0 +1,103 @@
+/* CommandCenter — Balanced IxDF-informed C2 dark theme
+   High contrast, clear hierarchy, cyan accent for active/system status.
+   Designed for sustained watch-standing readability.
+*/
+
+:root {
+  --bg: #0B0E14;
+  --surface: #141B26;
+  --surface-alt: #1A2332;
+  --text: #E6EDF5;
+  --text-secondary: #8B9BB4;
+  --accent: #00C2D8;
+  --accent-dim: #008B9A;
+  --border: #1E2A3A;
+  --incoming-bg: #141B26;
+  --outgoing-bg: #16202C;
+  --radius: 4px;
+  --pad: 8px 12px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body, #Chat {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13.5px;
+  line-height: 1.45;
+  padding: 10px 12px;
+}
+
+.chatItem {
+  margin-bottom: 6px;
+  max-width: 92%;
+}
+
+.chatItem.followUp {
+  margin-top: -2px;
+  margin-bottom: 4px;
+}
+
+.incomingItem { margin-right: auto; }
+.outgoingItem { margin-left: auto; }
+
+.msgRow {
+  background: var(--incoming-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad);
+}
+
+.outgoingItem .msgRow {
+  background: var(--outgoing-bg);
+  border-color: #243044;
+}
+
+.msgMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 3px;
+  font-size: 11.5px;
+}
+
+.sender {
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.outgoingItem .sender {
+  color: #7DD3E0;
+}
+
+.timeStamp {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+}
+
+.message {
+  color: var(--text);
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.followUp .msgMeta { display: none; }
+
+.followUp .msgRow {
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding-top: 2px;
+}
+
+/* Subtle left accent bar for incoming */
+.incomingItem .msgRow {
+  border-left: 3px solid var(--accent-dim);
+}
+
+.outgoingItem .msgRow {
+  border-right: 3px solid #2A4A55;
+}

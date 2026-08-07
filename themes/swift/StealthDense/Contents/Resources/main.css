@@ -1,0 +1,92 @@
+/* StealthDense — Ultra-minimal, high density, single accent
+   Maximum information density for high-tempo ops channels.
+   Grayscale + one restrained accent. IxDF minimalist principle.
+*/
+
+:root {
+  --bg: #0C0C0E;
+  --surface: #16161A;
+  --text: #D0D0D4;
+  --text-secondary: #6E6E76;
+  --accent: #A0A0A8;
+  --border: #222228;
+  --incoming-bg: #16161A;
+  --outgoing-bg: #1A1A1E;
+  --radius: 2px;
+  --pad: 5px 9px;
+  --font: "SF Mono", "Consolas", "Liberation Mono", Menlo, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body, #Chat {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  line-height: 1.35;
+  padding: 6px 8px;
+}
+
+.chatItem {
+  margin-bottom: 2px;
+  max-width: 96%;
+}
+
+.chatItem.followUp {
+  margin-top: 0;
+  margin-bottom: 2px;
+}
+
+.incomingItem { margin-right: auto; }
+.outgoingItem { margin-left: auto; }
+
+.msgRow {
+  background: var(--incoming-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad);
+}
+
+.outgoingItem .msgRow {
+  background: var(--outgoing-bg);
+}
+
+.msgMeta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1px;
+  font-size: 10.5px;
+}
+
+.sender {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.outgoingItem .sender {
+  color: #C0C0C8;
+}
+
+.timeStamp {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.message {
+  color: var(--text);
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.followUp .msgMeta { display: none; }
+.followUp .msgRow {
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding-top: 0;
+}
+
+/* Very subtle left rule */
+.incomingItem .msgRow {
+  border-left: 2px solid #3A3A42;
+}

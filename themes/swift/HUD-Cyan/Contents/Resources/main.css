@@ -1,0 +1,95 @@
+/* HUD-Cyan — Strong situational-awareness / HUD aesthetic
+   Cyan glow edges, slightly more “active display” feel while remaining professional.
+*/
+
+:root {
+  --bg: #060B12;
+  --surface: #0E1620;
+  --text: #E8F4FC;
+  --text-secondary: #6A8BA0;
+  --accent: #00D4FF;
+  --accent-glow: rgba(0, 212, 255, 0.25);
+  --border: #1A2E3C;
+  --incoming-bg: #0E1620;
+  --outgoing-bg: #0F1A26;
+  --radius: 2px;
+  --pad: 8px 12px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body, #Chat {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13.5px;
+  line-height: 1.45;
+  padding: 10px 12px;
+}
+
+.chatItem {
+  margin-bottom: 7px;
+  max-width: 90%;
+}
+
+.chatItem.followUp {
+  margin-top: -2px;
+  margin-bottom: 4px;
+}
+
+.incomingItem { margin-right: auto; }
+.outgoingItem { margin-left: auto; }
+
+.msgRow {
+  background: var(--incoming-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad);
+  box-shadow: 0 0 0 1px transparent;
+}
+
+.outgoingItem .msgRow {
+  background: var(--outgoing-bg);
+  border-color: #1E3A4A;
+}
+
+.msgMeta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3px;
+  font-size: 11.5px;
+}
+
+.sender {
+  color: var(--accent);
+  font-weight: 600;
+  text-shadow: 0 0 6px var(--accent-glow);
+}
+
+.outgoingItem .sender {
+  color: #5CE1FF;
+}
+
+.timeStamp {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.message {
+  color: var(--text);
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.followUp .msgMeta { display: none; }
+.followUp .msgRow {
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding-top: 2px;
+}
+
+.incomingItem .msgRow {
+  border-left: 3px solid var(--accent);
+  box-shadow: -2px 0 8px -2px var(--accent-glow);
+}

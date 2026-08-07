@@ -1,0 +1,93 @@
+/* C2-Amber — Amber-forward attention language
+   Stronger visual cues for status / priority in busy C2 environments.
+   Still restrained and professional.
+*/
+
+:root {
+  --bg: #0C0A08;
+  --surface: #1A1612;
+  --text: #F0E8DC;
+  --text-secondary: #A09070;
+  --accent: #FFB000;
+  --accent-dim: #C48A00;
+  --border: #2A2418;
+  --incoming-bg: #1A1612;
+  --outgoing-bg: #1E1A14;
+  --radius: 3px;
+  --pad: 7px 11px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body, #Chat {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13.5px;
+  line-height: 1.42;
+  padding: 9px 11px;
+}
+
+.chatItem {
+  margin-bottom: 6px;
+  max-width: 91%;
+}
+
+.chatItem.followUp {
+  margin-top: -1px;
+  margin-bottom: 3px;
+}
+
+.incomingItem { margin-right: auto; }
+.outgoingItem { margin-left: auto; }
+
+.msgRow {
+  background: var(--incoming-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad);
+}
+
+.outgoingItem .msgRow {
+  background: var(--outgoing-bg);
+  border-color: #332C20;
+}
+
+.msgMeta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+  font-size: 11.5px;
+}
+
+.sender {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.outgoingItem .sender {
+  color: #FFC933;
+}
+
+.timeStamp {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.message {
+  color: var(--text);
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.followUp .msgMeta { display: none; }
+.followUp .msgRow {
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding-top: 1px;
+}
+
+.incomingItem .msgRow {
+  border-left: 3px solid var(--accent-dim);
+}

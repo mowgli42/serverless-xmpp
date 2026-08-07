@@ -1,0 +1,92 @@
+/* NightOps — Lowest luminance, amber attention accents
+   Optimized for darkened rooms / low ambient light.
+   IxDF: reduce visual fatigue during long night shifts.
+*/
+
+:root {
+  --bg: #07090D;
+  --surface: #10151C;
+  --text: #DDE4EC;
+  --text-secondary: #6B7A8F;
+  --accent: #FFB000;          /* amber attention */
+  --accent-dim: #C48A00;
+  --border: #1A222E;
+  --incoming-bg: #10151C;
+  --outgoing-bg: #121820;
+  --radius: 3px;
+  --pad: 7px 11px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body, #Chat {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 8px 10px;
+}
+
+.chatItem {
+  margin-bottom: 5px;
+  max-width: 90%;
+}
+
+.chatItem.followUp {
+  margin-top: -1px;
+  margin-bottom: 3px;
+}
+
+.incomingItem { margin-right: auto; }
+.outgoingItem { margin-left: auto; }
+
+.msgRow {
+  background: var(--incoming-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad);
+}
+
+.outgoingItem .msgRow {
+  background: var(--outgoing-bg);
+}
+
+.msgMeta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+  font-size: 11px;
+}
+
+.sender {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.outgoingItem .sender {
+  color: #E0A830;
+}
+
+.timeStamp {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.message {
+  color: var(--text);
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.followUp .msgMeta { display: none; }
+.followUp .msgRow {
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding-top: 1px;
+}
+
+.incomingItem .msgRow {
+  border-left: 2px solid var(--accent-dim);
+}
