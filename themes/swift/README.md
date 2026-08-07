@@ -45,6 +45,10 @@ Swift loads Adium-compatible themes from a path containing `Contents/Resources/`
 
 **Note:** These are prototypes. Test consecutive message grouping (`NextContent.html`) thoroughly.
 
+## Screenshots
+
+See [GALLERY.md](GALLERY.md) for live previews of all six themes with descriptions.
+
 ## Structure of each theme
 
 ```
@@ -61,8 +65,6 @@ ThemeName/
         │   └── NextContent.html
         └── Variants/                # Optional alternate CSS
 ```
-
-Full HTML templates and Demo.html previews are available in the original prototype set; the CSS files here define the visual language.
 
 ## License
 
