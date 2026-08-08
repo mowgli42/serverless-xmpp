@@ -4,6 +4,8 @@ Prototype set of **6 dark themes** for the [Swift XMPP client](https://swift.im/
 
 These themes live in this repo as client-side UI assets for improved message display and grouping when using the classic Swift desktop client alongside serverless-xmpp workflows.
 
+> **Scope note:** The HTML/CSS resources under `resources/themes/` (both the official Default and these prototypes) only style the **chat/conversation view** (message history pane). The rest of the Swift application (roster, menus, toolbars, window chrome) is controlled by Qt platform theming / QSS / Isode’s light-dark preference.
+
 ## Design Goals (IxDF-informed)
 
 - **Visibility of system status** — clear sender, timestamp, and consecutive-message grouping
@@ -14,7 +16,7 @@ These themes live in this repo as client-side UI assets for improved message dis
 - **Flexibility** — tight NextContent templates so consecutive messages from the same sender collapse cleanly
 - Accessibility-minded contrast and scannability for long watch-standing sessions
 
-### Core Palette Language
+### Core Palette Language (our themes)
 | Role              | Typical Hex     | Notes                          |
 |-------------------|-----------------|--------------------------------|
 | Background        | `#0B0E14` / `#0A0F1A` | Deep navy-black               |
@@ -25,6 +27,18 @@ These themes live in this repo as client-side UI assets for improved message dis
 | Accent (attention)| `#FFB000` / amber | Highlight / alert             |
 | Accent (positive) | `#5C8A3A` / olive | Secure / friendly             |
 | Border            | `#1E2A3A`       | Subtle separators             |
+
+## Comparison Table
+
+| Theme | Style | Background | Accent | Grouping / Density | Notes |
+|-------|-------|------------|--------|--------------------|-------|
+| **Default** (official) | Light, clean | White (`#fff`) | Subtle / Lato | Table layout, avatar column, more spacing | Official Swift chat theme from `resources/themes/Default` |
+| **CommandCenter** | Dark C2 | Near-black navy | Cyan | Tight consecutive messages | Balanced everyday ops |
+| **NightOps** | Very dark | Almost pure black | Amber | Low luminance | Night / low-light rooms |
+| **TacticalGreen** | Classic terminal | Deep green-black | Olive | Monospace feel | Military green-on-dark |
+| **HUD-Cyan** | Active HUD | Deep navy | Bright cyan + glow | Slightly more visual energy | Situational awareness |
+| **StealthDense** | Minimal | Pure dark | Grayscale | Highest density | High-tempo channels |
+| **C2-Amber** | Attention | Warm dark | Amber | Strong status cues | Priority / alert feel |
 
 ## Themes Included
 
@@ -43,11 +57,11 @@ Swift loads Adium-compatible themes from a path containing `Contents/Resources/`
 2. Point Swift at the folder via its theme selection UI / preferences (exact location depends on version and OS).
 3. Select the theme / variant inside Swift.
 
-**Note:** These are prototypes. Test consecutive message grouping (`NextContent.html`) thoroughly.
+**Note:** These are prototypes. Test consecutive message grouping (`NextContent.html`) thoroughly. The official Default theme lives in the Swift source at `Swift/resources/themes/Default/`.
 
 ## Screenshots
 
-See [GALLERY.md](GALLERY.md) for live previews of all six themes with descriptions.
+See [GALLERY.md](GALLERY.md) for live previews of all six military themes with descriptions.
 
 ## Structure of each theme
 
