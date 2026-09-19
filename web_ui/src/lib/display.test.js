@@ -9,6 +9,8 @@ import {
   findLocalContact,
   formatLocalIdentity,
   formatHashCompact,
+  formatPendingUpdate,
+  formatSyncStatusLine,
   isAwaitingConnection,
   isTransportConnected,
   sortContacts,
@@ -119,5 +121,47 @@ describe('connection-aware display', () => {
 
   it('formats compact hash', () => {
     expect(formatHashCompact('SHA256:' + 'ab'.repeat(32))).toContain('Book abababababab');
+  });
+});
+
+describe('sync status display', () => {
+  it('formats unconfigured sync status', () => {
+    expect(
+      formatSyncStatusLine({
+        enabled: false,
+        auto_apply: false,
+        pending_count: 0,
+        secret_configured: false,
+      }),
+    ).toContain('Not configured');
+  });
+
+  it('formats enabled sync status', () => {
+    expect(
+      formatSyncStatusLine({
+        enabled: true,
+        auto_apply: true,
+        pending_count: 2,
+        secret_configured: true,
+      }),
+    ).toContain('Enabled');
+    expect(
+      formatSyncStatusLine({
+        enabled: true,
+        auto_apply: true,
+        pending_count: 2,
+        secret_configured: true,
+      }),
+    ).toContain('2 pending');
+  });
+
+  it('formats pending update line', () => {
+    expect(
+      formatPendingUpdate({
+        action: 'add',
+        from_jid: 'bob@xmpp.example',
+        contact_id: 'bob',
+      }),
+    ).toBe('add from bob@xmpp.example (bob)');
   });
 });

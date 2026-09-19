@@ -14,6 +14,7 @@ from xmpp_p2p_chat.common.api_client import APIClient
 from xmpp_p2p_chat.text_ui.display import (
     format_addressbook_status_panel,
     format_contact_detail,
+    format_sync_status_panel,
     presence_symbol,
     transport_label,
 )
@@ -192,6 +193,14 @@ class AddressBookScreen(ModalScreen[str | None]):
         border: solid $primary-darken-2;
         background: $panel;
     }
+    #ab-sync {
+        height: auto;
+        max-height: 10;
+        padding: 1;
+        margin-bottom: 1;
+        border: solid $primary-darken-3;
+        background: $boost;
+    }
     #ab-hash {
         height: auto;
         padding: 0 1 1 1;
@@ -213,6 +222,13 @@ class AddressBookScreen(ModalScreen[str | None]):
         height: auto;
         margin-top: 1;
     }
+    #ab-sync-actions {
+        height: auto;
+        margin-top: 1;
+    }
+    #ab-sync-actions Button {
+        margin-right: 1;
+    }
     #ab-actions Button {
         margin-right: 1;
     }
@@ -226,14 +242,24 @@ class AddressBookScreen(ModalScreen[str | None]):
         self.health: dict = {}
         self.connection: dict = {}
         self.ab_status: dict = {}
+        self.sync_status: dict = {}
+        self.pending_updates: list[dict] = []
 
     def compose(self) -> ComposeResult:
         with Vertical(id="ab-dialog"):
             yield Label("Address Book — Status & Contacts", id="ab-title")
             yield Static("Loading…", id="ab-status")
+            yield Static("", id="ab-sync")
             yield Static("", id="ab-hash")
             yield DataTable(id="ab-table", cursor_type="row", zebra_stripes=True)
             yield Static("[dim]Select a contact · Enter opens chat · n=new · delete=remove[/dim]", id="ab-detail")
+            with Horizontal(id="ab-sync-actions"):
+                yield Button("Sync now", id="btn-sync-now")
+                yield Button("Enable sync", id="btn-sync-enable")
+                yield Button("Disable sync", id="btn-sync-disable")
+                yield Button("Auto-apply", id="btn-sync-auto")
+                yield Button("Apply pending", id="btn-sync-apply")
+                yield Button("Reject pending", id="btn-sync-reject")
             with Horizontal(id="ab-actions"):
                 yield Button("New contact", id="btn-new", variant="primary")
                 yield Button("Remove", id="btn-remove", variant="error")
@@ -254,13 +280,39 @@ class AddressBookScreen(ModalScreen[str | None]):
             self.ab_status = listed.get("status") or await self.client.call("addressbook.status")
             self.health = await self.client.call("system.health")
             self.connection = await self.client.call("connection.status")
+            self.sync_status = await self.client.call("addressbook.sync_status")
+            pending = await self.client.call("addressbook.get_pending_updates")
+            self.pending_updates = pending.get("updates", [])
         except Exception as exc:  # noqa: BLE001
             self.query_one("#ab-status", Static).update(f"[red]Error loading address book: {exc}[/]")
             return
 
         self._render_status()
+        self._render_sync()
         self._render_table()
         self._render_detail(None)
+
+    def _render_sync(self) -> None:
+        self.query_one("#ab-sync", Static).update(
+            format_sync_status_panel(
+                sync_status=self.sync_status,
+                pending_updates=self.pending_updates,
+            )
+        )
+        secret_ok = self.sync_status.get("secret_configured", False)
+        enabled = self.sync_status.get("enabled", False)
+        auto_apply = self.sync_status.get("auto_apply", False)
+        has_pending = bool(self.pending_updates)
+
+        self.query_one("#btn-sync-now", Button).disabled = not (secret_ok and enabled)
+        self.query_one("#btn-sync-enable", Button).disabled = not secret_ok or enabled
+        self.query_one("#btn-sync-disable", Button).disabled = not enabled
+        self.query_one("#btn-sync-auto", Button).disabled = not enabled
+        self.query_one("#btn-sync-auto", Button).label = (
+            "Auto-apply: on" if auto_apply else "Auto-apply: off"
+        )
+        self.query_one("#btn-sync-apply", Button).disabled = not has_pending
+        self.query_one("#btn-sync-reject", Button).disabled = not has_pending
 
     def _render_status(self) -> None:
         self.query_one("#ab-status", Static).update(
@@ -382,3 +434,77 @@ class AddressBookScreen(ModalScreen[str | None]):
     @on(Button.Pressed, "#btn-close")
     async def on_close_pressed(self) -> None:
         await self.action_dismiss()
+
+    @on(Button.Pressed, "#btn-sync-now")
+    async def on_sync_now_pressed(self) -> None:
+        try:
+            await self.client.call("addressbook.sync_now")
+            self.notify("Address book sync pushed to XMPP contacts")
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Sync failed: {exc}", severity="error")
+            return
+        await self.refresh_data()
+
+    @on(Button.Pressed, "#btn-sync-enable")
+    async def on_sync_enable_pressed(self) -> None:
+        try:
+            self.sync_status = await self.client.call(
+                "addressbook.enable_sync", {"enabled": True}
+            )
+            self.notify("Address book sync enabled")
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Enable failed: {exc}", severity="error")
+            return
+        await self.refresh_data()
+
+    @on(Button.Pressed, "#btn-sync-disable")
+    async def on_sync_disable_pressed(self) -> None:
+        try:
+            self.sync_status = await self.client.call(
+                "addressbook.enable_sync", {"enabled": False}
+            )
+            self.notify("Address book sync disabled")
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Disable failed: {exc}", severity="error")
+            return
+        await self.refresh_data()
+
+    @on(Button.Pressed, "#btn-sync-auto")
+    async def on_sync_auto_pressed(self) -> None:
+        auto_apply = not self.sync_status.get("auto_apply", False)
+        try:
+            self.sync_status = await self.client.call(
+                "addressbook.enable_sync",
+                {"enabled": True, "auto_apply": auto_apply},
+            )
+            self.notify(f"Auto-apply {'enabled' if auto_apply else 'disabled'}")
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Auto-apply toggle failed: {exc}", severity="error")
+            return
+        await self.refresh_data()
+
+    @on(Button.Pressed, "#btn-sync-apply")
+    async def on_sync_apply_pressed(self) -> None:
+        if not self.pending_updates:
+            return
+        pending_id = self.pending_updates[0]["id"]
+        try:
+            await self.client.call("addressbook.apply_pending_update", {"id": pending_id})
+            self.notify("Applied pending sync update")
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Apply failed: {exc}", severity="error")
+            return
+        await self.action_refresh()
+
+    @on(Button.Pressed, "#btn-sync-reject")
+    async def on_sync_reject_pressed(self) -> None:
+        if not self.pending_updates:
+            return
+        pending_id = self.pending_updates[0]["id"]
+        try:
+            await self.client.call("addressbook.reject_pending_update", {"id": pending_id})
+            self.notify("Rejected pending sync update")
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Reject failed: {exc}", severity="error")
+            return
+        await self.refresh_data()

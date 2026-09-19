@@ -17,6 +17,8 @@ from xmpp_p2p_chat.text_ui.display import (
     format_local_identity,
     format_message_log,
     format_message_timestamp,
+    format_pending_update_line,
+    format_sync_status_panel,
     is_transport_connected,
     prepare_contact_list,
     presence_symbol,
@@ -142,6 +144,47 @@ class TestDisplayHelpers:
         assert "v1" in panel
         assert "direct-p2p:connected" in panel
 
+    def test_sync_status_panel_not_configured(self):
+        panel = format_sync_status_panel(
+            sync_status={
+                "enabled": False,
+                "auto_apply": False,
+                "pending_count": 0,
+                "secret_configured": False,
+            }
+        )
+        assert "Not configured" in panel
+        assert "secret" in panel
+
+    def test_sync_status_panel_with_pending(self):
+        panel = format_sync_status_panel(
+            sync_status={
+                "enabled": True,
+                "auto_apply": False,
+                "pending_count": 1,
+                "secret_configured": True,
+            },
+            pending_updates=[
+                {
+                    "id": "p1",
+                    "from_jid": "bob@xmpp.example",
+                    "action": "add",
+                    "contact_id": "bob",
+                }
+            ],
+        )
+        assert "Enabled" in panel
+        assert "manual review" in panel
+        assert "add" in panel
+        assert "bob@xmpp.example" in panel
+
+    def test_pending_update_line(self):
+        line = format_pending_update_line(
+            {"action": "update", "from_jid": "carol@xmpp.example", "contact_id": "carol"}
+        )
+        assert "update" in line
+        assert "carol@xmpp.example" in line
+
 
 class TestChatAppDisplay:
     """Textual Pilot tests for main chat display workflow."""
@@ -253,3 +296,37 @@ class TestAddressBookScreenDisplay:
             assert "contacts" in status
             hash_text = str(screen.query_one("#ab-hash").content)
             assert "█" in hash_text
+
+    @pytest.mark.asyncio
+    async def test_addressbook_screen_sync_panel(self, mock_api):
+        from xmpp_p2p_chat.text_ui.screens.addressbook import AddressBookScreen
+
+        mock_api.responses["addressbook.sync_status"] = {
+            "enabled": True,
+            "auto_apply": False,
+            "pending_count": 1,
+            "secret_configured": True,
+        }
+        mock_api.responses["addressbook.get_pending_updates"] = {
+            "updates": [
+                {
+                    "id": "p1",
+                    "from_jid": "bob@xmpp.example",
+                    "action": "add",
+                    "contact_id": "bob",
+                    "payload": {},
+                    "status": "pending",
+                }
+            ]
+        }
+
+        app = ChatApp(api_url="ws://127.0.0.1:9/rpc")
+        screen = AddressBookScreen(mock_api)
+
+        async with app.run_test(size=(120, 40)):
+            await app.push_screen(screen)
+            await screen.refresh_data()
+            sync_text = str(screen.query_one("#ab-sync").content)
+            assert "Address book sync" in sync_text
+            assert "Enabled" in sync_text
+            assert "bob@xmpp.example" in sync_text
