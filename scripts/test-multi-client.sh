@@ -6,6 +6,16 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export DATA_ROOT="${DATA_ROOT:-$ROOT/.test-data}"
 COMPOSE_FILE="$ROOT/docker/docker-compose.yml"
 
+config_home_for() {
+  local name="$1"
+  echo "$DATA_ROOT/$name/config"
+}
+
+config_path_for() {
+  local name="$1"
+  echo "$(config_home_for "$name")/xmpp-p2p-chat/config.toml"
+}
+
 usage() {
   cat <<EOF
 Usage: $0 <command>
@@ -22,14 +32,18 @@ Prosody / XMPP server mode:
 Serverless P2P mode:
   init-p2p-alice  Write serverless P2P alice config (API :8765, listen :5223)
   init-p2p-bob    Write serverless P2P bob config (API :8766, listen :5224)
+  service-p2p-alice  Run connection service as P2P alice
+  service-p2p-bob    Run connection service as P2P bob
   p2p-fingerprints  Print TLS cert fingerprints (run after both services started once)
   test-p2p        Run direct P2P pytest suite
+  test-p2p-live   Start both P2P services and run live bidirectional messaging test
 
 General:
   test-rpc        Run API integration tests
 
 Environment:
   DATA_ROOT   Base directory for test data (default: $DATA_ROOT)
+  FRESH       Set to 1 for test-p2p-live to remove existing P2P test dirs first
 EOF
 }
 
@@ -43,8 +57,10 @@ ensure_venv() {
 write_config() {
   local name="$1" port="$2" peer="$3"
   local dir="$DATA_ROOT/$name"
-  mkdir -p "$dir/config" "$dir/data"
-  cat >"$dir/config/config.toml" <<CFG
+  local config_path
+  config_path="$(config_path_for "$name")"
+  mkdir -p "$(dirname "$config_path")" "$dir/data"
+  cat >"$config_path" <<CFG
 [data]
 directory = "$dir/data"
 
@@ -88,19 +104,25 @@ cmd_teardown() {
 }
 
 cmd_init_p2p_alice() {
-  local dir="$DATA_ROOT/p2p-alice"
-  mkdir -p "$dir/config" "$dir/data"
-  cp "$ROOT/examples/config.p2p-alice.toml" "$dir/config/config.toml"
-  sed -i "s|~/.local/share/xmpp-p2p-alice|$dir/data|g" "$dir/config/config.toml"
+  local name="p2p-alice"
+  local dir="$DATA_ROOT/$name"
+  local config_path
+  config_path="$(config_path_for "$name")"
+  mkdir -p "$(dirname "$config_path")" "$dir/data"
+  cp "$ROOT/examples/config.p2p-alice.toml" "$config_path"
+  sed -i "s|~/.local/share/xmpp-p2p-alice|$dir/data|g" "$config_path"
   cp "$ROOT/examples/addressbook.p2p-alice.json" "$dir/data/addressbook.json"
   echo "P2P alice config: $dir"
 }
 
 cmd_init_p2p_bob() {
-  local dir="$DATA_ROOT/p2p-bob"
-  mkdir -p "$dir/config" "$dir/data"
-  cp "$ROOT/examples/config.p2p-bob.toml" "$dir/config/config.toml"
-  sed -i "s|~/.local/share/xmpp-p2p-bob|$dir/data|g" "$dir/config/config.toml"
+  local name="p2p-bob"
+  local dir="$DATA_ROOT/$name"
+  local config_path
+  config_path="$(config_path_for "$name")"
+  mkdir -p "$(dirname "$config_path")" "$dir/data"
+  cp "$ROOT/examples/config.p2p-bob.toml" "$config_path"
+  sed -i "s|~/.local/share/xmpp-p2p-bob|$dir/data|g" "$config_path"
   cp "$ROOT/examples/addressbook.p2p-bob.json" "$dir/data/addressbook.json"
   echo "P2P bob config: $dir"
 }
@@ -134,18 +156,69 @@ cmd_init_bob() { write_config bob 8766 alice; }
 run_service() {
   local name="$1"
   ensure_venv
-  export XDG_CONFIG_HOME="$DATA_ROOT/$name/config"
+  export XDG_CONFIG_HOME="$(config_home_for "$name")"
+  export XDG_DATA_HOME="$DATA_ROOT/$name/data"
+  exec "$ROOT/.venv/bin/python" -m xmpp_p2p_chat.connection_service
+}
+
+run_p2p_service() {
+  local name="$1"
+  ensure_venv
+  export XDG_CONFIG_HOME="$(config_home_for "$name")"
   export XDG_DATA_HOME="$DATA_ROOT/$name/data"
   exec "$ROOT/.venv/bin/python" -m xmpp_p2p_chat.connection_service
 }
 
 cmd_service_alice() { run_service alice; }
 cmd_service_bob() { run_service bob; }
+cmd_service_p2p_alice() { run_p2p_service p2p-alice; }
+cmd_service_p2p_bob() { run_p2p_service p2p-bob; }
 
 cmd_test_rpc() {
   ensure_venv
   cd "$ROOT"
   "$ROOT/.venv/bin/pytest" tests/test_api.py tests/test_addressbook.py tests/test_config.py -v
+}
+
+P2P_ALICE_PID=""
+P2P_BOB_PID=""
+
+cleanup_p2p_live() {
+  [[ -n "$P2P_ALICE_PID" ]] && kill "$P2P_ALICE_PID" 2>/dev/null || true
+  [[ -n "$P2P_BOB_PID" ]] && kill "$P2P_BOB_PID" 2>/dev/null || true
+  wait "$P2P_ALICE_PID" 2>/dev/null || true
+  wait "$P2P_BOB_PID" 2>/dev/null || true
+}
+
+cmd_test_p2p_live() {
+  ensure_venv
+
+  if [[ "${FRESH:-}" == "1" ]]; then
+    rm -rf "$DATA_ROOT/p2p-alice" "$DATA_ROOT/p2p-bob"
+  fi
+
+  cmd_init_p2p_alice
+  cmd_init_p2p_bob
+
+  trap cleanup_p2p_live EXIT
+
+  mkdir -p "$DATA_ROOT/p2p-alice" "$DATA_ROOT/p2p-bob"
+
+  export XDG_CONFIG_HOME="$(config_home_for p2p-alice)"
+  export XDG_DATA_HOME="$DATA_ROOT/p2p-alice/data"
+  "$ROOT/.venv/bin/python" -m xmpp_p2p_chat.connection_service \
+    >"$DATA_ROOT/p2p-alice/service.log" 2>&1 &
+  P2P_ALICE_PID=$!
+
+  export XDG_CONFIG_HOME="$(config_home_for p2p-bob)"
+  export XDG_DATA_HOME="$DATA_ROOT/p2p-bob/data"
+  "$ROOT/.venv/bin/python" -m xmpp_p2p_chat.connection_service \
+    >"$DATA_ROOT/p2p-bob/service.log" 2>&1 &
+  P2P_BOB_PID=$!
+
+  sleep 3
+
+  "$ROOT/.venv/bin/python" "$ROOT/scripts/test-p2p-live.py"
 }
 
 cmd_test_chat() {
@@ -154,7 +227,8 @@ cmd_test_chat() {
   cmd_init_bob
   cmd_setup
 
-  export XDG_CONFIG_HOME="$DATA_ROOT/alice/config"
+  export XDG_CONFIG_HOME="$(config_home_for alice)"
+  export XDG_DATA_HOME="$DATA_ROOT/alice/data"
   "$ROOT/.venv/bin/python" -m xmpp_p2p_chat.connection_service &
   ALICE_PID=$!
   sleep 2
@@ -193,7 +267,10 @@ case "${1:-}" in
   test-p2p) cmd_test_p2p ;;
   service-alice) cmd_service_alice ;;
   service-bob) cmd_service_bob ;;
+  service-p2p-alice) cmd_service_p2p_alice ;;
+  service-p2p-bob) cmd_service_p2p_bob ;;
   test-rpc) cmd_test_rpc ;;
   test-chat) cmd_test_chat ;;
+  test-p2p-live) cmd_test_p2p_live ;;
   *) usage; exit 1 ;;
 esac
