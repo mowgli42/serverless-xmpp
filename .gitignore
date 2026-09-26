@@ -24,3 +24,7 @@ addressbook.json.bad
 .screenshot-data/
 docs/screenshots/*.svg
 .gstack/
+
+# Secrets (never commit private keys)
+*-key.pem
+*.key

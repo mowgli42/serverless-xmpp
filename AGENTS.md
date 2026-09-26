@@ -130,3 +130,6 @@ Reference: Interaction Design Foundation (IxDF) principles and chat UI patterns.
 **Follow these rules and the OpenSpec artifacts, and you will produce high-quality, aligned code that the user can trust.**
 
 Welcome to the project. Let's build something excellent.
+## Secrets
+
+Do not commit private keys, *-key.pem, *.key, .env secrets, or BEGIN … PRIVATE KEY. Generate locally; gitignore keys.
